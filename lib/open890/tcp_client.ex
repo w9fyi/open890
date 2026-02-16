@@ -115,32 +115,61 @@ defmodule Open890.TCPClient do
     [val >>> 8, val &&& 0xff]
   end
 
-  def handle_info({:tcp, _socket, _msg}, {:noreply, state}) do
-    Logger.error("Got TCP :noreply")
+  def handle_info({:tcp, _socket, _msg}, {:noreply, %{connection: connection} = state}) do
+    Logger.error("Got TCP :noreply state")
 
-    broadcast_connection_state(state.connection, {:down, :tcp_noreply})
+    broadcast_connection_state(connection, {:down, :tcp_noreply})
     {:stop, :shutdown, state}
+  end
+
+  def handle_info({:tcp, _socket, _msg}, {:noreply, other_state}) do
+    Logger.error("Got TCP :noreply with invalid state: #{inspect(other_state)}")
+    {:stop, :shutdown, other_state}
   end
 
   # networking
   @impl true
   def handle_info({:tcp, socket, msg}, %{socket: socket} = state) do
-    new_state =
+    result =
       msg
       |> String.split(";")
       |> Enum.reject(&(&1 == ""))
-      |> Enum.reduce(state, fn single_message, acc ->
-        handle_msg(single_message, acc)
+      |> Enum.reduce_while(state, fn single_message, acc ->
+        case handle_msg(single_message, acc) do
+          {:stop, reason, new_state} ->
+            {:halt, {:stop, reason, new_state}}
+
+          {:noreply, %{} = new_state} ->
+            {:cont, new_state}
+
+          %{} = new_state ->
+            {:cont, new_state}
+
+          other ->
+            Logger.error("Unexpected handle_msg return for #{inspect(single_message)}: #{inspect(other)}")
+            {:cont, acc}
+        end
       end)
 
-    {:noreply, new_state}
+    case result do
+      {:stop, reason, new_state} ->
+        {:stop, reason, new_state}
+
+      %{} = new_state ->
+        {:noreply, new_state}
+    end
+  end
+
+  def handle_info({:tcp_closed, _socket}, %{connection: connection} = state) do
+    Logger.warn("TCP socket closed.")
+
+    broadcast_connection_state(connection, {:down, :tcp_closed})
+
+    {:stop, :shutdown, state}
   end
 
   def handle_info({:tcp_closed, _socket}, state) do
-    Logger.warn("TCP socket closed.")
-
-    broadcast_connection_state(state.connection, {:down, :tcp_closed})
-
+    Logger.warn("TCP socket closed with invalid state: #{inspect(state)}")
     {:stop, :shutdown, state}
   end
 
@@ -243,7 +272,9 @@ defmodule Open890.TCPClient do
     Logger.warn(msg)
     broadcast_connection_state(state.connection, {:down, :kns_in_use})
 
-    {:noreply, socket}
+    if socket, do: :gen_tcp.close(socket)
+
+    {:stop, :shutdown, state}
   end
 
   # connection allowed response
@@ -268,11 +299,11 @@ defmodule Open890.TCPClient do
 
     state
   end
-
-  # Incorrect username/password
-  def handle_msg("##ID0", %{connection: connection} = state) do
+  def handle_msg("##ID0", %{connection: connection, socket: socket} = state) do
     Logger.warn("Error connecting to radio: Incorrect username or password")
     broadcast_connection_state(connection, {:down, :bad_credentials})
+
+    if socket, do: :gen_tcp.close(socket)
 
     {:stop, :shutdown, state}
   end

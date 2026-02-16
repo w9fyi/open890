@@ -13,6 +13,7 @@ if config_env() in [:dev, :prod] do
       port: port,
       transport_options: [socket_opts: [:inet6]]
     ],
+    check_origin: false,
     url: [host: host, port: port],
     server: true,
     secret_key_base: secret_key_base

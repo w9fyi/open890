@@ -169,6 +169,9 @@ defmodule Open890Web.Components.BandScope do
           data-max-value="140"
           width="1280"
           height="275"
+          tabindex="0"
+          role="application"
+          aria-label="Band scope. Use arrow up and down to tune. Use shift plus arrows for larger channel movement."
           ></canvas>
       </div>
 

@@ -28,9 +28,9 @@ defmodule Open890Web.Components.VFODisplayComponent do
                 </div>
 
                 <div class="twelve wide right aligned column">
-                  <div class="freq active" phx-hook="ActiveVFO" id="ActiveVFO">
+                  <button type="button" class="freq active" phx-hook="ActiveVFO" id="ActiveVFO" aria-label="Open direct frequency entry">
                     <%= vfo_display_frequency(@active_frequency, @transverter_state) %>
-                  </div>
+                  </button>
                 </div>
               </div>
 

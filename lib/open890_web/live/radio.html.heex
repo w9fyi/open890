@@ -27,9 +27,9 @@
                 <h1 class="band-modal-header">Direct Frequency Entry</h1>
               </div>
               <div class="four wide right aligned column">
-                <div id="BandModalClose" class="ui icon button" phx-click="toggle_band_selector">
+                <button type="button" id="BandModalClose" class="ui icon button" phx-click="toggle_band_selector" aria-label="Close direct frequency entry">
                   <i class="close icon"></i>
-                </div>
+                </button>
               </div>
             </div>
           </div>
@@ -45,6 +45,7 @@
                   <div class="ui grid">
                     <div class="six wide column">
                       <div class="">
+                        <label for="direct-frequency-entry-field" class="sr-only">Direct frequency entry</label>
                         <input
                           id="direct-frequency-entry-field"
                           type="text"
@@ -122,19 +123,19 @@
         <div class="six wide column top-indicator">
           <!-- connection status -->
           <%= if connection_startable?(@connection_state) do %>
-            <div class="ui small button" phx-click="start_connection" data-tooltip="Start connection" data-position="bottom center">
+            <button type="button" class="ui small button" phx-click="start_connection" data-tooltip="Start connection" data-position="bottom center">
               <i class="play circle outline icon"></i>
               <span class="secondaryText">
                 <%= format_connection_state(@connection_state) %>
               </span>
-            </div>
+            </button>
           <% else %>
-            <div class="ui small black button" phx-click="stop_connection" data-tooltip="Stop connection" data-position="bottom center">
+            <button type="button" class="ui small black button" phx-click="stop_connection" data-tooltip="Stop connection" data-position="bottom center">
               <i class="stop circle outline icon"></i>
               <span class="secondaryText">
                 <%= format_connection_state(@connection_state) %>
               </span>
-            </div>
+            </button>
           <% end %>
 
         </div>
@@ -148,27 +149,34 @@
               <VoipButtons.mic_button enabled={@voip_mic_enabled} />
             </div>
           <% end %>
+            <div id="audio-input-device" class="audio-input-device" phx-hook="AudioInputDevice">
+              <label class="audio-input-label secondaryText" for="audio-input-select">Microphone</label>
+              <select id="audio-input-select" class="ui mini dropdown audio-input-select">
+                <option value="default">System Default</option>
+              </select>
+              <span class="secondaryText audio-input-status">Input: System Default</span>
+            </div>
         </div>
         <div class="three wide column top-indicator">
           <%= if @radio_state.voip_available do %>
 
             <div phx-hook="AudioStream" id="AudioStreamPlayer">
               <%= if @connection_state == :up && @radio_state.voip_enabled do %>
-                <div class="ui small black button" phx-click="stop_voip" data-tooltip="Stop VOIP audio" data-position="bottom center">
+                <button type="button" class="ui small black button" phx-click="stop_voip" data-tooltip="Stop VOIP audio" data-position="bottom center">
                   <span class="secondaryText">
                     VOIP Audio: Streaming &nbsp;
                     <i class="icon small sync rotating"></i>
                   </span>
-                </div>
+                </button>
               <% else %>
                 <%= if @connection_state == :up do %>
-                  <div class="ui small icon black button" phx-click="start_voip" data-tooltip="Start VOIP Audio" data-position="bottom center">
+                  <button type="button" class="ui small icon black button" phx-click="start_voip" data-tooltip="Start VOIP Audio" data-position="bottom center">
                     <span class="secondaryText">VOIP Audio: Stopped</span>
-                  </div>
+                  </button>
                 <% else %>
-                  <div class="ui small icon black button disabled">
+                  <button type="button" class="ui small icon black button disabled" disabled>
                     <span class="secondaryText">VOIP Audio: Stopped</span>
-                  </div>
+                  </button>
                 <% end %>
               <% end %>
             </div>
@@ -182,6 +190,13 @@
               </div>
             <% end %>
           <% end %>
+          <div id="audio-output-device" class="audio-output-device" phx-hook="AudioOutputDevice">
+            <label class="audio-output-label secondaryText" for="audio-output-select">Audio Output</label>
+            <select id="audio-output-select" class="ui mini dropdown audio-output-select">
+              <option value="default">System Default</option>
+            </select>
+            <span class="secondaryText audio-output-status">Output: System Default</span>
+          </div>
 
         </div>
 
@@ -375,10 +390,34 @@
       <!-- tab buttons -->
       <div class="row">
         <div class="column">
-          <div class="ui secondary inverted pointing three item menu">
-            <a class={tab_classes("ant", @active_tab)} phx-click="set_tab" phx-value-tab="ant">TX/ANT</a>
-            <a class={tab_classes("txrx", @active_tab)} phx-click="set_tab" phx-value-tab="txrx">RX</a>
-            <a class={tab_classes("scope", @active_tab)} phx-click="set_tab" phx-value-tab="scope">Scope</a>
+          <div class="ui secondary inverted pointing three item menu" role="tablist" aria-label="Left control panel tabs">
+            <button
+              type="button"
+              class={tab_classes("ant", @active_tab)}
+              role="tab"
+              id="tab-ant"
+              aria-selected={@active_tab == "ant"}
+              aria-controls="tab-panel-ant"
+              phx-click="set_tab"
+              phx-value-tab="ant">TX/ANT</button>
+            <button
+              type="button"
+              class={tab_classes("txrx", @active_tab)}
+              role="tab"
+              id="tab-txrx"
+              aria-selected={@active_tab == "txrx"}
+              aria-controls="tab-panel-txrx"
+              phx-click="set_tab"
+              phx-value-tab="txrx">RX</button>
+            <button
+              type="button"
+              class={tab_classes("scope", @active_tab)}
+              role="tab"
+              id="tab-scope"
+              aria-selected={@active_tab == "scope"}
+              aria-controls="tab-panel-scope"
+              phx-click="set_tab"
+              phx-value-tab="scope">Scope</button>
           </div>
         </div>
       </div>
@@ -390,7 +429,7 @@
       <!-- tab contents -->
       <div class="row">
         <div class="column">
-          <div class={tab_panel_classes("ant", @active_tab)}>
+          <div id="tab-panel-ant" class={tab_panel_classes("ant", @active_tab)} role="tabpanel" aria-labelledby="tab-ant" tabindex="0">
             <div class="ui two column grid row">
               <div class="column">
                 <.atu_button value={@radio_state.tuner_state} fluid />
@@ -443,7 +482,7 @@
 
           </div>
 
-          <div class={tab_panel_classes("txrx", @active_tab)}>
+          <div id="tab-panel-txrx" class={tab_panel_classes("txrx", @active_tab)} role="tabpanel" aria-labelledby="tab-txrx" tabindex="0">
 
             <div class="ui two column grid row">
               <div class="column">
@@ -501,7 +540,7 @@
             </div>
           </div>
 
-          <div class={tab_panel_classes("scope", @active_tab)}>
+          <div id="tab-panel-scope" class={tab_panel_classes("scope", @active_tab)} role="tabpanel" aria-labelledby="tab-scope" tabindex="0">
             <div class="column">
               <.scope_mode_button fluid band_scope_mode={@radio_state.band_scope_mode} />
             </div>
@@ -566,7 +605,7 @@
         <div class="ui two column grid row">
           <%= for %{"label" => name} <- @__ui_macros do %>
             <div class="column">
-              <div class="ui black fluid button" phx-click="run_macro" phx-value-name={name}><%= name %></div>
+              <button type="button" class="ui black fluid button" phx-click="run_macro" phx-value-name={name}><%= name %></button>
             </div>
           <% end %>
         </div>
@@ -574,7 +613,7 @@
 
     </div>
 
-    <div class="bandscopePanel toggle" phx-click="toggle_panel"></div>
+    <button type="button" class="bandscopePanel toggle" phx-click="toggle_panel" aria-label="Toggle left control panel"></button>
 
     <div class="bandscopePanel right">
       <%# When changing anything here, make sure the changes are reflected in the pop-out bandscope as well %>

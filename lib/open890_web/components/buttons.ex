@@ -580,11 +580,17 @@ defmodule Open890Web.Components.Buttons do
         _ -> ""
       end
 
-    assigned_classes = case assigns[:classes] do
+    normalize_classes = fn
       arr when is_list(arr) -> arr |> Enum.join(" ")
       str when is_binary(str) -> str
       _ -> ""
     end
+
+    assigned_classes =
+      [assigns[:classes], assigns[:class]]
+      |> Enum.map(normalize_classes)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.join(" ")
 
     size_class =
       if ~w(mini tiny small medium large big huge massive)
@@ -604,12 +610,17 @@ defmodule Open890Web.Components.Buttons do
 
     classes = "ui #{size_class} #{color_class} button #{assigned_classes} #{fluid_class}"
 
-    assigns = assign(assigns, :classes, classes)
+    attrs = assigns_to_attributes(assigns, [:fluid, :classes, :class, :cmd, :inner_block])
+
+    assigns =
+      assigns
+      |> assign(:classes, classes)
+      |> assign(:attrs, attrs)
 
     ~H"""
-      <div class={@classes} phx-click="cmd" phx-value-cmd={@cmd}>
+      <button type="button" class={@classes} phx-click="cmd" phx-value-cmd={@cmd} {@attrs}>
         <%= render_slot(@inner_block) %>
-      </div>
+      </button>
     """
   end
 
@@ -663,8 +674,9 @@ defmodule Open890Web.Components.Buttons do
     ~H"""
       <div class="ui small black fluid button" id="RefLevelControl">
         <form class="" id="refLevel" phx-change="ref_level_changed">
+          <label for="ref-level-input" class="sr-only">Reference level in dB</label>
           Ref:
-          <input class="miniTextInput" name="refLevel" type="number" min="-20" max="10" step="0.5" value={format_ref_level(@value)} />
+          <input id="ref-level-input" class="miniTextInput" name="refLevel" type="number" min="-20" max="10" step="0.5" value={format_ref_level(@value)} />
           dB
         </form>
       </div>
@@ -752,8 +764,9 @@ defmodule Open890Web.Components.Buttons do
     ~H"""
       <div class="ui small black fluid button">
         <form id="WaterfallSpeed" phx-hook="WaterfallSpeedForm">
+          <label for="waterfall-speed-input" class="sr-only">Waterfall speed divisor</label>
           WF speed: 1 /
-          <input class="miniTextInput" name="value" type="number" min="1" max="100" step="1" value={@value} />
+          <input id="waterfall-speed-input" class="miniTextInput" name="value" type="number" min="1" max="100" step="1" value={@value} />
         </form>
       </div>
     """
@@ -763,8 +776,9 @@ defmodule Open890Web.Components.Buttons do
     ~H"""
       <div class="ui small black fluid button">
         <form id="SpectrumScale" phx-hook="SpectrumScaleForm">
+          <label for="spectrum-scale-input" class="sr-only">Spectrum scale</label>
           Scale:
-          <input class="miniTextInput" name="value" type="number" min="1" max="10" step="0.1" value={@value} />
+          <input id="spectrum-scale-input" class="miniTextInput" name="value" type="number" min="1" max="10" step="0.1" value={@value} />
         </form>
       </div>
     """
@@ -786,10 +800,10 @@ defmodule Open890Web.Components.Buttons do
   def pop_out_bandscope_button(assigns) do
     ~H"""
       <%= if !assigns[:popout] do %>
-        <div class="ui small black fluid button" phx-hook="PopoutBandscope" data-connection-id={@radio_connection.id} id="bandscope_popout">
+        <button type="button" class="ui small black fluid button" phx-hook="PopoutBandscope" data-connection-id={@radio_connection.id} id="bandscope_popout">
           Popout &nbsp;
           <i class="icon external alternate"></i>
-        </div>
+        </button>
       <% end %>
     """
   end

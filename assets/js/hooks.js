@@ -7,8 +7,66 @@ function PCMPlayer(t){this.init(t)}PCMPlayer.prototype.init=function(t){this.opt
 
 let Hooks = {
   AudioRecorder: {
+    selectedDeviceId() {
+      return window.localStorage.getItem("open890.mic_input_device") || "default"
+    },
+
+    applyMicOptions() {
+      const selectedDeviceId = this.selectedDeviceId()
+      const options = {
+        frameLength: 320,
+        outputSampleRate: 16000,
+      }
+
+      if (selectedDeviceId && selectedDeviceId !== "default") {
+        options.deviceId = selectedDeviceId
+      }
+
+      WebVoiceProcessor.setOptions(options)
+    },
+
+    async startMicCapture() {
+      this.applyMicOptions()
+      await WebVoiceProcessor.subscribe(this.engine)
+      console.log("Success starting VOIP microphone")
+    },
+
+    async stopMicCapture() {
+      try {
+        await WebVoiceProcessor.unsubscribe(this.engine)
+      } catch (error) {
+        console.error("Failed to stop VOIP microphone", error)
+      }
+    },
+
+    async handleMicInputSelection(deviceId) {
+      const selectedDeviceId = deviceId || this.selectedDeviceId()
+
+      if (!this.micEnabled) {
+        window.dispatchEvent(new CustomEvent("open890:mic-input-result", {
+          detail: {
+            deviceId: selectedDeviceId,
+            ok: true,
+            reason: "saved"
+          }
+        }))
+        return
+      }
+
+      await this.stopMicCapture()
+      await this.startMicCapture()
+
+      window.dispatchEvent(new CustomEvent("open890:mic-input-result", {
+        detail: {
+          deviceId: selectedDeviceId,
+          ok: true
+        }
+      }))
+    },
+
     mounted() {
       let me = this;
+      this.micEnabled = false
 
       this.engine = {
         onmessage: function(e) {
@@ -21,25 +79,74 @@ let Hooks = {
         }
       }
 
+      this.onSetMicInput = async (event) => {
+        const requestedDeviceId = event && event.detail && event.detail.deviceId
+          ? event.detail.deviceId
+          : this.selectedDeviceId()
+
+        try {
+          await this.handleMicInputSelection(requestedDeviceId)
+        } catch (error) {
+          window.dispatchEvent(new CustomEvent("open890:mic-input-result", {
+            detail: {
+              deviceId: requestedDeviceId,
+              ok: false,
+              message: error && error.message ? error.message : "Unable to switch microphone"
+            }
+          }))
+          window.alert(error.message)
+        }
+      }
+
+      window.addEventListener("open890:set-mic-input", this.onSetMicInput)
+
       this.handleEvent("toggle_mic", (event) => {
         if (event.enabled) {
-          WebVoiceProcessor.setOptions({
-            frameLength: 320,
-            outputSampleRate: 16000,
-          })
-          WebVoiceProcessor.subscribe(this.engine).then(() => {
-            console.log("Success starting VOIP microphone")
-          }).catch((err) => {
+          this.micEnabled = true
+
+          this.startMicCapture().catch((err) => {
             window.alert(err.message)
           })
         } else {
-          WebVoiceProcessor.unsubscribe(this.engine)
+          this.micEnabled = false
+          this.stopMicCapture()
         }
       })
+    },
+
+    destroyed() {
+      if (this.onSetMicInput) {
+        window.removeEventListener("open890:set-mic-input", this.onSetMicInput)
+      }
+
+      this.stopMicCapture()
     }
 
   },
   AudioStream: {
+    async setAudioOutputDevice(deviceId) {
+      if (!this.player || !this.player.audioCtx) {
+        return {ok: false, reason: "player_unavailable"}
+      }
+
+      if (typeof this.player.audioCtx.setSinkId !== "function") {
+        return {ok: false, reason: "unsupported"}
+      }
+
+      try {
+        await this.player.audioCtx.setSinkId(deviceId || "default")
+        return {ok: true}
+      } catch (error) {
+        console.error("Unable to set audio output device", error)
+
+        return {
+          ok: false,
+          reason: "error",
+          message: error && error.message ? error.message : "Unable to set audio output device"
+        }
+      }
+    },
+
     mounted() {
       console.log("AudioStream: mounted")
 
@@ -62,6 +169,317 @@ let Hooks = {
           this.player.feed(new Uint8Array(data.payload))
         }
       })
+
+      this.onSetAudioOutput = async (event) => {
+        const requestedDeviceId = event && event.detail && event.detail.deviceId ? event.detail.deviceId : "default"
+        const result = await this.setAudioOutputDevice(requestedDeviceId)
+
+        window.dispatchEvent(new CustomEvent("open890:audio-output-result", {
+          detail: {
+            deviceId: requestedDeviceId,
+            ...result
+          }
+        }))
+      }
+
+      window.addEventListener("open890:set-audio-output", this.onSetAudioOutput)
+
+      const savedDeviceId = window.localStorage.getItem("open890.audio_output_device") || "default"
+      this.onSetAudioOutput({detail: {deviceId: savedDeviceId}})
+    },
+
+    destroyed() {
+      if (this.audioStreamChannel) {
+        this.audioStreamChannel.leave()
+      }
+
+      if (this.player) {
+        this.player.destroy()
+      }
+
+      if (this.onSetAudioOutput) {
+        window.removeEventListener("open890:set-audio-output", this.onSetAudioOutput)
+      }
+    }
+  },
+
+  AudioOutputDevice: {
+    mounted() {
+      this.select = this.el.querySelector("select")
+      this.status = this.el.querySelector(".audio-output-status")
+      this.storageKey = "open890.audio_output_device"
+      this.defaultOptionLabel = "System Default"
+
+      const AudioContextCtor = window.AudioContext || window.webkitAudioContext
+      this.isSinkSelectionSupported = !!(
+        AudioContextCtor &&
+        AudioContextCtor.prototype &&
+        typeof AudioContextCtor.prototype.setSinkId === "function"
+      )
+
+      this.onOutputResult = (event) => {
+        const details = event && event.detail ? event.detail : null
+
+        if (!details || !this.select || details.deviceId !== this.select.value) {
+          return
+        }
+
+        if (details.ok) {
+          const selectedLabel = this.select.options[this.select.selectedIndex]
+            ? this.select.options[this.select.selectedIndex].text
+            : this.defaultOptionLabel
+
+          this.renderStatus(`Output: ${selectedLabel}`)
+          return
+        }
+
+        if (details.reason === "unsupported") {
+          this.renderStatus("Use your system audio output selector")
+          return
+        }
+
+        if (details.reason === "player_unavailable") {
+          this.renderStatus("Audio player not active")
+          return
+        }
+
+        this.renderStatus(details.message || "Could not switch output")
+      }
+
+      this.onDeviceChange = () => {
+        this.populateOutputDevices()
+      }
+
+      if (navigator.mediaDevices && typeof navigator.mediaDevices.addEventListener === "function") {
+        navigator.mediaDevices.addEventListener("devicechange", this.onDeviceChange)
+      }
+
+      window.addEventListener("open890:audio-output-result", this.onOutputResult)
+
+      if (this.select) {
+        this.select.addEventListener("change", () => {
+          const deviceId = this.select.value || "default"
+          window.localStorage.setItem(this.storageKey, deviceId)
+          this.dispatchSelection(deviceId)
+        })
+      }
+
+      this.populateOutputDevices()
+    },
+
+    destroyed() {
+      if (navigator.mediaDevices && typeof navigator.mediaDevices.removeEventListener === "function" && this.onDeviceChange) {
+        navigator.mediaDevices.removeEventListener("devicechange", this.onDeviceChange)
+      }
+
+      if (this.onOutputResult) {
+        window.removeEventListener("open890:audio-output-result", this.onOutputResult)
+      }
+    },
+
+    dispatchSelection(deviceId) {
+      window.dispatchEvent(new CustomEvent("open890:set-audio-output", {
+        detail: {deviceId: deviceId || "default"}
+      }))
+    },
+
+    setOptions(options, selectedDeviceId) {
+      if (!this.select) {
+        return
+      }
+
+      this.select.innerHTML = ""
+
+      options.forEach((option) => {
+        const node = document.createElement("option")
+        node.value = option.deviceId
+        node.textContent = option.label
+        this.select.appendChild(node)
+      })
+
+      const hasSelectedDevice = options.some((option) => option.deviceId === selectedDeviceId)
+      this.select.value = hasSelectedDevice ? selectedDeviceId : "default"
+    },
+
+    async populateOutputDevices() {
+      if (!this.select) {
+        return
+      }
+
+      const savedDeviceId = window.localStorage.getItem(this.storageKey) || "default"
+
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== "function") {
+        this.setOptions([{deviceId: "default", label: this.defaultOptionLabel}], savedDeviceId)
+        this.select.disabled = true
+        this.renderStatus("Use your system audio output selector")
+        return
+      }
+
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const outputDevices = devices.filter((device) => device.kind === "audiooutput")
+
+        const options = [
+          {deviceId: "default", label: this.defaultOptionLabel},
+          ...outputDevices.map((device, index) => {
+            const label = device.label && device.label.trim() !== ""
+              ? device.label
+              : `Speaker ${index + 1}`
+
+            return {deviceId: device.deviceId, label}
+          })
+        ]
+
+        this.setOptions(options, savedDeviceId)
+
+        this.select.disabled = !this.isSinkSelectionSupported
+
+        if (!this.isSinkSelectionSupported) {
+          this.renderStatus("Use your system audio output selector")
+          return
+        }
+
+        this.dispatchSelection(this.select.value || "default")
+      } catch (error) {
+        console.error("Unable to enumerate audio output devices", error)
+        this.setOptions([{deviceId: "default", label: this.defaultOptionLabel}], savedDeviceId)
+        this.select.disabled = true
+        this.renderStatus("Audio outputs unavailable")
+      }
+    },
+
+    renderStatus(text) {
+      if (this.status) {
+        this.status.textContent = text
+      }
+    }
+  },
+
+  AudioInputDevice: {
+    mounted() {
+      this.select = this.el.querySelector("select")
+      this.status = this.el.querySelector(".audio-input-status")
+      this.storageKey = "open890.mic_input_device"
+      this.defaultOptionLabel = "System Default"
+
+      this.onInputResult = (event) => {
+        const details = event && event.detail ? event.detail : null
+
+        if (!details || !this.select || details.deviceId !== this.select.value) {
+          return
+        }
+
+        if (details.ok) {
+          const selectedLabel = this.select.options[this.select.selectedIndex]
+            ? this.select.options[this.select.selectedIndex].text
+            : this.defaultOptionLabel
+
+          this.renderStatus(`Input: ${selectedLabel}`)
+          return
+        }
+
+        this.renderStatus(details.message || "Could not switch microphone")
+      }
+
+      this.onDeviceChange = () => {
+        this.populateInputDevices()
+      }
+
+      if (navigator.mediaDevices && typeof navigator.mediaDevices.addEventListener === "function") {
+        navigator.mediaDevices.addEventListener("devicechange", this.onDeviceChange)
+      }
+
+      window.addEventListener("open890:mic-input-result", this.onInputResult)
+
+      if (this.select) {
+        this.select.addEventListener("change", () => {
+          const deviceId = this.select.value || "default"
+          window.localStorage.setItem(this.storageKey, deviceId)
+          this.dispatchSelection(deviceId)
+        })
+      }
+
+      this.populateInputDevices()
+    },
+
+    destroyed() {
+      if (navigator.mediaDevices && typeof navigator.mediaDevices.removeEventListener === "function" && this.onDeviceChange) {
+        navigator.mediaDevices.removeEventListener("devicechange", this.onDeviceChange)
+      }
+
+      if (this.onInputResult) {
+        window.removeEventListener("open890:mic-input-result", this.onInputResult)
+      }
+    },
+
+    dispatchSelection(deviceId) {
+      window.dispatchEvent(new CustomEvent("open890:set-mic-input", {
+        detail: {deviceId: deviceId || "default"}
+      }))
+    },
+
+    setOptions(options, selectedDeviceId) {
+      if (!this.select) {
+        return
+      }
+
+      this.select.innerHTML = ""
+
+      options.forEach((option) => {
+        const node = document.createElement("option")
+        node.value = option.deviceId
+        node.textContent = option.label
+        this.select.appendChild(node)
+      })
+
+      const hasSelectedDevice = options.some((option) => option.deviceId === selectedDeviceId)
+      this.select.value = hasSelectedDevice ? selectedDeviceId : "default"
+    },
+
+    async populateInputDevices() {
+      if (!this.select) {
+        return
+      }
+
+      const savedDeviceId = window.localStorage.getItem(this.storageKey) || "default"
+
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== "function") {
+        this.setOptions([{deviceId: "default", label: this.defaultOptionLabel}], savedDeviceId)
+        this.select.disabled = true
+        this.renderStatus("Microphone devices unavailable")
+        return
+      }
+
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const inputDevices = devices.filter((device) => device.kind === "audioinput")
+
+        const options = [
+          {deviceId: "default", label: this.defaultOptionLabel},
+          ...inputDevices.map((device, index) => {
+            const label = device.label && device.label.trim() !== ""
+              ? device.label
+              : `Microphone ${index + 1}`
+
+            return {deviceId: device.deviceId, label}
+          })
+        ]
+
+        this.setOptions(options, savedDeviceId)
+        this.select.disabled = false
+        this.dispatchSelection(this.select.value || "default")
+      } catch (error) {
+        console.error("Unable to enumerate microphone devices", error)
+        this.setOptions([{deviceId: "default", label: this.defaultOptionLabel}], savedDeviceId)
+        this.select.disabled = true
+        this.renderStatus("Microphone devices unavailable")
+      }
+    },
+
+    renderStatus(text) {
+      if (this.status) {
+        this.status.textContent = text
+      }
     }
   },
   Tabs: {
@@ -168,6 +586,23 @@ let Hooks = {
 
         var isScrollUp = event.deltaY < 0;
         this.pushEvent("adjust_rit_xit", {is_up: isScrollUp})
+      })
+
+      this.el.addEventListener("keydown", (event) => {
+        switch (event.key) {
+          case "ArrowUp":
+          case "ArrowRight":
+          case "PageUp":
+            event.preventDefault()
+            this.pushEvent("adjust_rit_xit", {is_up: true})
+            break
+          case "ArrowDown":
+          case "ArrowLeft":
+          case "PageDown":
+            event.preventDefault()
+            this.pushEvent("adjust_rit_xit", {is_up: false})
+            break
+        }
       })
 
       this.el.addEventListener("touchstart", (event) => {
@@ -329,10 +764,10 @@ let Hooks = {
     mounted() {
       this.el.addEventListener("wheel", (event) => {
         event.preventDefault();
-        let isScrollUp = (event.deltaY < 0);
+        const isScrollUp = event.deltaY < 0;
 
-        let dir = isScrollUp ? "up" : "down";
-        let isShifted = event.shiftKey;
+        const dir = isScrollUp ? "up" : "down";
+        const isShifted = event.shiftKey;
 
         console.log("audioScope wheel, dir:", dir, "shifted", isShifted, "event:", event);
         this.pushEvent("adjust_filter", {dir: dir, shift: isShifted})
@@ -341,6 +776,26 @@ let Hooks = {
       this.el.addEventListener("click", (event) => {
         event.preventDefault();
         this.pushEvent("cw_tune", {})
+      })
+
+      this.el.addEventListener("keydown", (event) => {
+        switch (event.key) {
+          case "ArrowUp":
+          case "ArrowRight":
+            event.preventDefault()
+            this.pushEvent("adjust_filter", {dir: "up", shift: event.shiftKey})
+            break
+          case "ArrowDown":
+          case "ArrowLeft":
+            event.preventDefault()
+            this.pushEvent("adjust_filter", {dir: "down", shift: event.shiftKey})
+            break
+          case "Enter":
+          case " ":
+            event.preventDefault()
+            this.pushEvent("cw_tune", {})
+            break
+        }
       })
     }
   },
@@ -500,6 +955,33 @@ let Hooks = {
         }
       });
 
+      this.el.addEventListener("keydown", event => {
+        if (me.locked) { return; }
+
+        switch (event.key) {
+          case "ArrowUp":
+          case "ArrowRight":
+          case "PageUp":
+            event.preventDefault()
+            if (event.shiftKey) {
+              this.pushEvent("multi_ch", {is_up: true})
+            } else {
+              this.pushEvent("step_tune_up", {stepSize: 0})
+            }
+            break
+          case "ArrowDown":
+          case "ArrowLeft":
+          case "PageDown":
+            event.preventDefault()
+            if (event.shiftKey) {
+              this.pushEvent("multi_ch", {is_up: false})
+            } else {
+              this.pushEvent("step_tune_down", {stepSize: 0})
+            }
+            break
+        }
+      })
+
       this.el.addEventListener("mousemove", event => {
         if (me.locked) { return; }
 
@@ -596,53 +1078,131 @@ let Hooks = {
   Slider: {
     mounted() {
       this.action = this.el.dataset.clickAction
-      this.wheelAction = this.el.dataset.wheelAction;
+      this.wheelAction = this.el.dataset.wheelAction
+      this.rangeInput = this.el.querySelector(".sliderRangeInput")
 
-      this.el.addEventListener('wheel', (event) => {
-        event.preventDefault();
+      this.applyValue(this.currentValue())
 
-        if (this.el.dataset.enabled !== "true") {
-          return
-        }
-        var isScrollUp = (event.deltaY < 0)
-        this.pushEvent(this.wheelAction, {is_up: isScrollUp})
-      })
+      if (this.rangeInput) {
+        this.rangeInput.addEventListener("input", (event) => {
+          if (!this.isEnabled()) {
+            return
+          }
 
-      this.el.addEventListener('click', (event) => {
-        event.stopPropagation()
+          const nextValue = this.applyValue(Number(event.target.value))
+          this.pushAbsolute(nextValue)
+        })
+      }
+
+      this.el.addEventListener("wheel", (event) => {
         event.preventDefault()
 
-        if (this.el.dataset.enabled !== "true") {
+        if (!this.isEnabled()) {
           return
         }
 
-        let coords = this.getClickCoords(event)
-        let x = Math.floor(coords.x)
-
-        this.pushEvent(this.action, {value: x})
-      })
-
-      this.el.addEventListener("mousemove", event => {
-        if (this.el.dataset.enabled !== "true") {
-          return;
-        }
-
-        if (event.buttons && event.buttons == 1) {
-          let coords = this.getClickCoords(event)
-          let x = Math.floor(coords.x)
-          this.pushEvent(this.action, {value: x})
-        }
+        const isScrollUp = event.deltaY < 0
+        this.nudge(isScrollUp)
       })
     },
 
-    getClickCoords(event) {
-      let rect = event.target.getBoundingClientRect();
-      let x = event.clientX - rect.left; //x position within the element.
-      let y = event.clientY - rect.top;  //y position within the element.
+    updated() {
+      this.applyValue(this.currentValue())
+    },
 
-      return {x: x, y: y}
+    isEnabled() {
+      return this.el.dataset.enabled === "true"
+    },
+
+    maxValue() {
+      const parsed = Number(this.el.dataset.maxValue)
+
+      if (Number.isFinite(parsed)) {
+        return parsed
+      }
+
+      return 255
+    },
+
+    stepValue() {
+      if (this.rangeInput) {
+        const inputStep = Number(this.rangeInput.step)
+
+        if (Number.isFinite(inputStep) && inputStep > 0) {
+          return inputStep
+        }
+      }
+
+      const parsed = Number(this.el.dataset.step)
+
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed
+      }
+
+      return 1
+    },
+
+    currentValue() {
+      if (this.rangeInput) {
+        const inputValue = Number(this.rangeInput.value)
+
+        if (Number.isFinite(inputValue)) {
+          return inputValue
+        }
+      }
+
+      const parsed = Number(this.el.dataset.currentValue)
+
+      if (Number.isFinite(parsed)) {
+        return parsed
+      }
+
+      return 0
+    },
+
+    clamp(value) {
+      return Math.max(0, Math.min(this.maxValue(), value))
+    },
+
+    applyValue(value) {
+      const clamped = this.clamp(Math.round(value))
+
+      this.el.dataset.currentValue = String(clamped)
+
+      if (this.rangeInput) {
+        this.rangeInput.value = String(clamped)
+
+        const label = this.rangeInput.getAttribute("aria-label") || "slider"
+        this.rangeInput.setAttribute("aria-valuenow", String(clamped))
+        this.rangeInput.setAttribute("aria-valuetext", `${label}: ${clamped}`)
+      }
+
+      const indicator = this.el.querySelector(".indicator")
+      if (indicator) {
+        const max = this.maxValue()
+        const width = max > 0 ? Math.round((clamped / max) * 255) : 0
+        indicator.style.width = `${width}px`
+      }
+
+      return clamped
+    },
+
+    pushAbsolute(value) {
+      if (this.action) {
+        this.pushEvent(this.action, {value: value})
+      }
+    },
+
+    nudge(isUp) {
+      const delta = isUp ? this.stepValue() : -this.stepValue()
+      const nextValue = this.applyValue(this.currentValue() + delta)
+
+      if (this.action) {
+        this.pushEvent(this.action, {value: nextValue})
+      } else if (this.wheelAction) {
+        this.pushEvent(this.wheelAction, {is_up: isUp})
+      }
     }
-
   },
 
   SpectrumScaleForm: {
