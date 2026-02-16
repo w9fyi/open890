@@ -5,11 +5,14 @@ defmodule Open890Web.Components.RitXit do
 
   def offset_indicator(assigns) do
     ~H"""
-      <span
+      <button
+        type="button"
         class={offset_class(@rit_enabled, @xit_enabled)}
-        phx-hook="RitXitControl" id="RitXitControl">
+        phx-hook="RitXitControl"
+        id="RitXitControl"
+        aria-label="RIT and XIT offset control">
         <%= @offset |> RadioViewHelpers.format_rit_xit() %>
-      </span>
+      </button>
     """
   end
 

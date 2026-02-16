@@ -8,16 +8,23 @@ defmodule Open890Web.Components.Slider do
   attr :max_value, :integer, required: false
   attr :padded_top_value, :integer, required: false
   attr :padded_top, :boolean, default: false
+  attr :step, :integer, required: false
   attr :value, :any, required: true
   attr :wheel, :string, required: false
 
   def slider(assigns) do
     labeled = !is_nil(assigns[:label]) && assigns[:label] != ""
     max_value = Map.get(assigns, :max_value, 255)
+    step = Map.get(assigns, :step, 1)
+    value = normalized_value(assigns[:value])
+    aria_label = aria_label(assigns[:label], assigns[:id])
 
     assigns = assign(assigns, %{
       labeled: labeled,
-      max_value: max_value
+      max_value: max_value,
+      step: step,
+      value: value,
+      aria_label: aria_label
     })
 
     ~H"""
@@ -25,12 +32,47 @@ defmodule Open890Web.Components.Slider do
         <%= if @labeled do %>
           <span class="label"><%= @label %></span>
         <% end %>
-        <div class={wrapper_class(assigns)} phx-hook="Slider" data-click-action={@click} data-wheel-action={@wheel} id={@id || id_for(@label)}
-          data-enabled={enabled_state(assigns)}>
+        <div
+          class={wrapper_class(assigns)}
+          phx-hook="Slider"
+          data-click-action={@click}
+          data-wheel-action={@wheel}
+          data-enabled={enabled_state(assigns)}
+          data-max-value={@max_value}
+          data-current-value={@value}
+          data-step={@step}
+          id={@id || id_for(@label)}>
+          <input
+            class="sliderRangeInput"
+            type="range"
+            min="0"
+            max={@max_value}
+            step={@step}
+            value={@value}
+            disabled={!@enabled}
+            aria-label={@aria_label}
+            aria-valuemin="0"
+            aria-valuemax={@max_value}
+            aria-valuenow={@value}
+            aria-valuetext={slider_value_text(@aria_label, @value)} />
           <div class="indicator" style={style_attr(@value, @max_value)}></div>
         </div>
       </div>
     """
+  end
+
+  def normalized_value(value) when is_integer(value), do: value
+  def normalized_value(_), do: 0
+
+  def aria_label(label, _id) when is_binary(label) and label != "" do
+    "#{label} slider"
+  end
+
+  def aria_label(_, id) when is_binary(id), do: "#{id} slider"
+  def aria_label(_, _), do: "slider"
+
+  def slider_value_text(label, value) do
+    "#{label}: #{value}"
   end
 
   def enabled_state(assigns) do
@@ -39,15 +81,15 @@ defmodule Open890Web.Components.Slider do
     |> to_string()
   end
 
-  def style_attr(value, max_value) when is_integer(value) and is_integer(max_value) do
+  def style_attr(value, max_value) when is_integer(value) and is_integer(max_value) and max_value > 0 do
     width = value / 1
-    percentage = (width / max_value)
+    percentage = width / max_value
     width = (percentage * 255) |> round()
 
     "width: #{width}px;"
   end
 
-  def style_attr(nil, _), do: "width: 0px;"
+  def style_attr(_, _), do: "width: 0px;"
 
   def id_for(label) do
     "#{label}Slider"
