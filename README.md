@@ -284,9 +284,17 @@ Current state:
 - Decoder service is wired into the server audio pipeline.
 - FT8 tab is available in the UI with enable/disable and decode list.
 - Helper binary protocol is in place.
-- Default helper is currently a stub that returns no decodes.
+- FT8 helper now decodes using WSJT-X `jt9` (installed separately on the host).
 
-### 1) Build the FT8 helper stub
+### 0) Install WSJT-X decoder binary
+
+```bash
+sudo apt-get install wsjtx
+```
+
+`jt9` is provided by this package. If it is installed in a non-standard path, set `OPEN890_FT8_JT9_BIN`.
+
+### 1) Build the FT8 helper
 
 ```bash
 cd ~/open890
@@ -300,6 +308,8 @@ This creates `priv/bin/open890_ft8_decoder`.
 ```bash
 export OPEN890_FT8_ENABLED=true
 export OPEN890_FT8_BIN="$HOME/open890/priv/bin/open890_ft8_decoder"
+# Optional: path to WSJT-X decoder binary
+export OPEN890_FT8_JT9_BIN="/usr/bin/jt9"
 # Optional tuning
 export OPEN890_FT8_TIMEOUT_MS=1200
 export OPEN890_FT8_SAMPLE_RATE_HZ=16000
@@ -313,5 +323,5 @@ export OPEN890_FT8_WINDOW_SECONDS=15
 
 ### GPL note for real WSJT-X integration
 
-The current scaffold does **not** yet include WSJT-X source code.
+This integration executes the WSJT-X `jt9` decoder binary for each 15-second FT8 window.
 When WSJT-X GPL code is integrated into distributed builds, distribution must comply with GPLv3 obligations for the combined work (source availability, notices, and downstream rights).

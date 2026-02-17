@@ -7,7 +7,12 @@ This document tracks the native FT8 integration path where decoding is performed
 - `Open890.FT8DecoderPort` receives denoised RX audio from `Open890.UDPAudioServer`.
 - The decoder runs as an external helper executable over an Elixir Port with packet framing.
 - UI integration is available in the Radio view under the `FT8` tab.
-- The initial helper (`c_src/open890_ft8_decoder_stub.c`) is a stub and returns no decodes.
+- The helper (`c_src/open890_ft8_decoder_wsjtx.c`) runs WSJT-X `jt9` and returns parsed FT8 decodes.
+
+## Dependencies
+
+- WSJT-X `jt9` binary must be installed (Debian/Raspberry Pi: `sudo apt-get install wsjtx`).
+- Optional override: set `OPEN890_FT8_JT9_BIN` to a custom `jt9` path.
 
 ## Port protocol
 
@@ -31,7 +36,7 @@ Decode entry fields expected by UI:
 
 ## Next step to use WSJT-X code
 
-Replace the stub helper implementation with a decoder helper that links or ports WSJT-X decode logic and outputs the same JSON schema.
+Current helper decodes by invoking WSJT-X `jt9`; future work can replace this with direct linked decoder internals while preserving the same JSON schema.
 
 ## Licensing note
 

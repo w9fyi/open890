@@ -241,7 +241,8 @@ defmodule Open890.FT8DecoderPort do
         (normalized ++ next_state.recent)
         |> Enum.take(@max_recent_decodes)
 
-      updated_state = %{next_state | recent: recent, last_error: nil}
+      helper_error = Map.get(decoded, "error")
+      updated_state = %{next_state | recent: recent, last_error: helper_error}
       broadcast_status(updated_state)
 
       {:ok, normalized, updated_state}

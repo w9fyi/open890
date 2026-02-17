@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SRC="$ROOT_DIR/c_src/open890_ft8_decoder_stub.c"
+SRC="$ROOT_DIR/c_src/open890_ft8_decoder_wsjtx.c"
 OUT="$ROOT_DIR/priv/bin/open890_ft8_decoder"
 
 mkdir -p "$(dirname "$OUT")"
