@@ -13,6 +13,7 @@ defmodule Open890Web.Live.Radio do
     KeyboardEntryState,
     RadioConnection,
     RNNoisePort,
+    FT8DecoderPort,
     RadioState,
     UserMarker
   }
@@ -43,12 +44,15 @@ defmodule Open890Web.Live.Radio do
 
     if connected?(socket) do
       RadioConnection.subscribe(Open890.PubSub, connection_id)
+      Phoenix.PubSub.subscribe(Open890.PubSub, "radio:ft8")
     end
 
     socket =
       socket
       |> assign(RadioSocketState.initial_state())
       |> assign(:software_nr_enabled, RNNoisePort.enabled?())
+      |> assign(:ft8_status, FT8DecoderPort.status())
+      |> assign(:ft8_enabled, FT8DecoderPort.enabled?())
 
     socket =
       with {:ok, file} <- File.read("config/config.toml"),
@@ -103,7 +107,7 @@ defmodule Open890Web.Live.Radio do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    selected_tab = params["panelTab"]
+    selected_tab = params["panelTab"] || socket.assigns.active_tab || "txrx"
 
     panel_open = params |> Map.get("panel", "true") == "true"
 
@@ -187,9 +191,27 @@ defmodule Open890Web.Live.Radio do
     {:noreply, socket}
   end
 
-  def handle_info(%Broadcast{event: "power_state", payload: payload}, socket) do
+  def handle_info(%Broadcast{event: "power_state", payload: _payload}, socket) do
     # ignore power state broadcasts for now
     {:noreply, socket}
+  end
+
+  def handle_info(%Broadcast{event: "ft8_decode", payload: payload}, socket) do
+    decodes =
+      [payload | socket.assigns.ft8_decodes]
+      |> Enum.take(25)
+
+    {:noreply, assign(socket, :ft8_decodes, decodes)}
+  end
+
+  def handle_info(%Broadcast{event: "ft8_status", payload: payload}, socket) do
+    active = Map.get(payload, :active, Map.get(payload, "active", false))
+    enabled = Map.get(payload, :enabled, Map.get(payload, "enabled", false))
+
+    {:noreply,
+     socket
+     |> assign(:ft8_status, payload)
+     |> assign(:ft8_enabled, active || enabled)}
   end
 
   def handle_info(%Broadcast{} = bc, socket) do
@@ -261,6 +283,22 @@ defmodule Open890Web.Live.Radio do
       |> assign(:software_nr_enabled, updated_enabled)
 
     {:noreply, socket}
+  end
+
+  def handle_event("toggle_ft8_decoder", _params, socket) do
+    enabled = !socket.assigns.ft8_enabled
+    updated_enabled = FT8DecoderPort.set_enabled(enabled)
+
+    socket =
+      socket
+      |> assign(:ft8_enabled, updated_enabled)
+      |> assign(:ft8_status, FT8DecoderPort.status())
+
+    {:noreply, socket}
+  end
+
+  def handle_event("clear_ft8_decodes", _params, socket) do
+    {:noreply, assign(socket, :ft8_decodes, [])}
   end
 
   def handle_event("direct_frequency_entry", %{"freq" => freq} = params, socket) do

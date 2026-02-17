@@ -19,7 +19,7 @@ if config_env() in [:dev, :prod] do
     secret_key_base: secret_key_base
 
   udp_port = System.get_env("OPEN890_UDP_PORT", "60001") |> String.to_integer()
-  udp_port = Enum.min([udp_port, 65535])
+  udp_port = Enum.min([udp_port, 65_535])
 
   config :open890, Open890.UDPAudioServer, port: udp_port
 
@@ -49,13 +49,60 @@ if config_env() in [:dev, :prod] do
     executable: rnnoise_executable,
     timeout_ms: rnnoise_timeout_ms
 
+  ft8_enabled =
+    case System.get_env("OPEN890_FT8_ENABLED", "false") |> String.downcase() do
+      "1" -> true
+      "true" -> true
+      "yes" -> true
+      "on" -> true
+      _ -> false
+    end
+
+  ft8_timeout_ms =
+    System.get_env("OPEN890_FT8_TIMEOUT_MS", "1200")
+    |> String.to_integer()
+    |> max(100)
+    |> min(10_000)
+
+  ft8_sample_rate_hz =
+    System.get_env("OPEN890_FT8_SAMPLE_RATE_HZ", "16000")
+    |> String.to_integer()
+    |> max(8000)
+    |> min(48_000)
+
+  ft8_window_seconds =
+    System.get_env("OPEN890_FT8_WINDOW_SECONDS", "15")
+    |> String.to_integer()
+    |> max(5)
+    |> min(30)
+
+  ft8_executable =
+    System.get_env(
+      "OPEN890_FT8_BIN",
+      Path.expand("../priv/bin/open890_ft8_decoder", __DIR__)
+    )
+
+  config :open890, Open890.FT8DecoderPort,
+    enabled: ft8_enabled,
+    executable: ft8_executable,
+    timeout_ms: ft8_timeout_ms,
+    sample_rate_hz: ft8_sample_rate_hz,
+    window_seconds: ft8_window_seconds
+
   Logger.info(
-    "Configured OPEN890_HOST: #{inspect(host)}, OPEN890_PORT: #{inspect(port)}, OPEN890_UDP_PORT: #{inspect(udp_port)}, OPEN890_RNNOISE_ENABLED: #{inspect(rnnoise_enabled)}"
+    "Configured OPEN890_HOST: #{inspect(host)}, OPEN890_PORT: #{inspect(port)}, OPEN890_UDP_PORT: #{inspect(udp_port)}, OPEN890_RNNOISE_ENABLED: #{inspect(rnnoise_enabled)}, OPEN890_FT8_ENABLED: #{inspect(ft8_enabled)}"
   )
 
   config :open890, Open890.RadioConnectionRepo, database: :"db/radio_connections.dets"
 else
   config :open890, Open890.UDPAudioServer, port: 60001
   config :open890, Open890.RNNoisePort, enabled: false, timeout_ms: 30
+
+  config :open890, Open890.FT8DecoderPort,
+    enabled: false,
+    timeout_ms: 1200,
+    sample_rate_hz: 16_000,
+    window_seconds: 15
+
   config :open890, Open890.RadioConnectionRepo, database: :"db/radio_connections_test.dets"
 end

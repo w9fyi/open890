@@ -3,6 +3,7 @@ defmodule Open890.UDPAudioServer do
   require Logger
 
   alias Open890.RNNoisePort
+  alias Open890.FT8DecoderPort
   alias Open890.RTP
 
   @socket_opts [:binary, active: true]
@@ -25,6 +26,7 @@ defmodule Open890.UDPAudioServer do
     |> case do
       {:ok, %RTP{payload: payload}} ->
         denoised_payload = RNNoisePort.denoise(payload)
+        FT8DecoderPort.ingest(denoised_payload)
 
         Open890Web.Endpoint.broadcast("radio:audio_stream", "audio_data", %{
           payload: :binary.bin_to_list(denoised_payload)

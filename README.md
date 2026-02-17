@@ -235,7 +235,7 @@ The following people have graciously donated monetarily to open890, and opted-in
 
 ## Legal mumbo-jumbo
 
-This project is licensed under the MIT license. Please see [MIT-LICENSE](MIT-LICENSE) for more details.
+This project is licensed under the MIT license. Please see [LICENSE](LICENSE) for more details.
 
 All product names, logos, brands, trademarks and registered trademarks are property of their respective owners. All company, product and service names used in this software are for identification purposes only.
 
@@ -274,3 +274,44 @@ export OPEN890_RNNOISE_TIMEOUT_MS=30
 ```
 
 If RNNoise is disabled or unavailable, open890 automatically falls back to passthrough audio.
+
+## Optional: Native FT8 Decoder Scaffold (Experimental)
+
+open890 now includes an **experimental FT8 decoder service scaffold** so we can integrate WSJT-X decoding natively.
+
+Current state:
+
+- Decoder service is wired into the server audio pipeline.
+- FT8 tab is available in the UI with enable/disable and decode list.
+- Helper binary protocol is in place.
+- Default helper is currently a stub that returns no decodes.
+
+### 1) Build the FT8 helper stub
+
+```bash
+cd ~/open890
+./scripts/build_open890_ft8_decoder.sh
+```
+
+This creates `priv/bin/open890_ft8_decoder`.
+
+### 2) Enable FT8 service
+
+```bash
+export OPEN890_FT8_ENABLED=true
+export OPEN890_FT8_BIN="$HOME/open890/priv/bin/open890_ft8_decoder"
+# Optional tuning
+export OPEN890_FT8_TIMEOUT_MS=1200
+export OPEN890_FT8_SAMPLE_RATE_HZ=16000
+export OPEN890_FT8_WINDOW_SECONDS=15
+```
+
+### 3) Start open890 and open the FT8 tab
+
+- Toggle **FT8 Decoder: ON**.
+- Watch decode output in the list.
+
+### GPL note for real WSJT-X integration
+
+The current scaffold does **not** yet include WSJT-X source code.
+When WSJT-X GPL code is integrated into distributed builds, distribution must comply with GPLv3 obligations for the combined work (source availability, notices, and downstream rights).

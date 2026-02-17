@@ -45,3 +45,5 @@ config.toml
 
 # Local TLS proxy artifacts
 /tls/
+
+/priv/bin/open890_ft8_decoder

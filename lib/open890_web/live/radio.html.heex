@@ -6,7 +6,6 @@
   phx-window-keydown="window_keydown"
   phx-window-keyup="window_keyup"
 >
-  
   <%= if false && @display_screen_id != 0 do %>
     <div id="menuModal" class="ui active modal">
       <div class="header">
@@ -503,7 +502,7 @@
       <div class="row">
         <div class="column">
           <div
-            class="ui secondary inverted pointing three item menu"
+            class="ui secondary inverted pointing four item menu"
             role="tablist"
             aria-label="Left control panel tabs"
           >
@@ -542,6 +541,18 @@
               phx-value-tab="scope"
             >
               Scope
+            </button>
+            <button
+              type="button"
+              class={tab_classes("ft8", @active_tab)}
+              role="tab"
+              id="tab-ft8"
+              aria-selected={@active_tab == "ft8"}
+              aria-controls="tab-panel-ft8"
+              phx-click="set_tab"
+              phx-value-tab="ft8"
+            >
+              FT8
             </button>
           </div>
         </div>
@@ -748,6 +759,81 @@
               <.pop_out_bandscope_button radio_connection={@radio_connection} fluid />
             </div>
           </div>
+
+          <div
+            id="tab-panel-ft8"
+            class={tab_panel_classes("ft8", @active_tab)}
+            role="tabpanel"
+            aria-labelledby="tab-ft8"
+            tabindex="0"
+          >
+            <div class="ui one column grid row">
+              <div class="column">
+                <button
+                  type="button"
+                  class={
+                    if @ft8_enabled,
+                      do: "ui small green fluid button",
+                      else: "ui small black fluid button"
+                  }
+                  phx-click="toggle_ft8_decoder"
+                >
+                  <%= if @ft8_enabled do %>
+                    FT8 Decoder: ON
+                  <% else %>
+                    FT8 Decoder: OFF
+                  <% end %>
+                </button>
+              </div>
+
+              <div class="column">
+                <button
+                  type="button"
+                  class="ui small black fluid button"
+                  phx-click="clear_ft8_decodes"
+                >
+                  Clear Decodes
+                </button>
+              </div>
+
+              <div class="column">
+                <div class="secondaryText">
+                  <strong>Status:</strong>
+                  <%= if Map.get(@ft8_status, :last_error, Map.get(@ft8_status, "last_error", nil)) do %>
+                    <span>
+                      <%= Map.get(
+                        @ft8_status,
+                        :last_error,
+                        Map.get(@ft8_status, "last_error", "")
+                      ) %>
+                    </span>
+                  <% else %>
+                    <span>Ready</span>
+                  <% end %>
+                </div>
+              </div>
+
+              <div class="column">
+                <div class="ui relaxed list">
+                  <%= if Enum.empty?(@ft8_decodes) do %>
+                    <div class="item secondaryText">No decodes yet.</div>
+                  <% else %>
+                    <%= for decode <- @ft8_decodes do %>
+                      <div class="item">
+                        <span class="secondaryText">
+                          <%= Map.get(decode, :timestamp, Map.get(decode, "timestamp", "")) %>
+                        </span>
+                        &nbsp;
+                        <span>
+                          <%= Map.get(decode, :text, Map.get(decode, "text", "")) %>
+                        </span>
+                      </div>
+                    <% end %>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <!-- macros -->
@@ -779,7 +865,6 @@
     </button>
 
     <div class="bandscopePanel right">
-      
       <BandScope.bandscope
         active_mode={RadioState.effective_active_mode(@radio_state)}
         band_scope_data={@band_scope_data}
