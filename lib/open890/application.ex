@@ -16,6 +16,7 @@ defmodule Open890.Application do
     {:ok, _filename} = RadioConnectionRepo.init()
 
     udp_config = Application.get_env(:open890, Open890.UDPAudioServer)
+    rnnoise_config = Application.get_env(:open890, Open890.RNNoisePort, [])
 
     children = [
       {Registry, [keys: :unique, name: @connection_registry]},
@@ -28,6 +29,7 @@ defmodule Open890.Application do
       {Open890.RadioConnectionSupervisor,
        strategy: :one_for_one, name: Open890.RadioConnectionSupervisor},
       {Open890.CloudlogSupervisor, strategy: :one_for_one, name: Open890.CloudlogSupervisor},
+      {Open890.RNNoisePort, rnnoise_config},
       {Open890.UDPAudioServer, udp_config}
     ]
 
@@ -68,18 +70,18 @@ defmodule Open890.Application do
     port = url_config[:port] || "4000"
 
     IO.puts("""
-                           ___ ___  ___
-       ___  ___  ___ ___  ( _ ) _ \\/ _ \\
-      / _ \\/ _ \\/ -_) _ \\/ _  \\_, / // /
-      \\___/ .__/\\__/_//_/\\___/___/\\___/
-         /_/
+                         ___ ___  ___
+     ___  ___  ___ ___  ( _ ) _ \\/ _ \\
+    / _ \\/ _ \\/ -_) _ \\/ _  \\_, / // /
+    \\___/ .__/\\__/_//_/\\___/___/\\___/
+       /_/
 
-      open890 is now running.  Press ^C^C (ctrl-c, ctrl-c) to stop.
+    open890 is now running.  Press ^C^C (ctrl-c, ctrl-c) to stop.
 
-      Access the web interface at http://#{host}:#{port}/
+    Access the web interface at http://#{host}:#{port}/
 
-      You can change the hostname, web, and UDP audio ports by setting OPEN890_HOST,
-      OPEN890_PORT, and OPEN890_UDP_PORT environment variables respectively.
-    """)
+    You can change the hostname, web, and UDP audio ports by setting OPEN890_HOST,
+    OPEN890_PORT, and OPEN890_UDP_PORT environment variables respectively.
+  """)
   end
 end

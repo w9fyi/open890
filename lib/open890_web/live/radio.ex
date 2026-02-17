@@ -12,6 +12,7 @@ defmodule Open890Web.Live.Radio do
     FrequencyEntryParser,
     KeyboardEntryState,
     RadioConnection,
+    RNNoisePort,
     RadioState,
     UserMarker
   }
@@ -44,7 +45,10 @@ defmodule Open890Web.Live.Radio do
       RadioConnection.subscribe(Open890.PubSub, connection_id)
     end
 
-    socket = socket |> assign(RadioSocketState.initial_state())
+    socket =
+      socket
+      |> assign(RadioSocketState.initial_state())
+      |> assign(:software_nr_enabled, RNNoisePort.enabled?())
 
     socket =
       with {:ok, file} <- File.read("config/config.toml"),
@@ -162,7 +166,11 @@ defmodule Open890Web.Live.Radio do
   end
 
   # Connection state messages
-  def handle_info(%Broadcast{event: "connection_state", payload: %{id: _id, state: connection_state}} = payload, socket) do
+  def handle_info(
+        %Broadcast{event: "connection_state", payload: %{id: _id, state: connection_state}} =
+          payload,
+        socket
+      ) do
     Logger.debug("Bandscope LV: RX connection_state: #{inspect(payload)}")
 
     {:noreply, assign(socket, :connection_state, connection_state)}
@@ -222,24 +230,41 @@ defmodule Open890Web.Live.Radio do
     {:noreply, socket}
   end
 
-  def handle_event("toggle_mic", _params, %{assigns: %{voip_mic_enabled: voip_mic_enabled}} = socket) do
+  def handle_event(
+        "toggle_mic",
+        _params,
+        %{assigns: %{voip_mic_enabled: voip_mic_enabled}} = socket
+      ) do
     enabled = !voip_mic_enabled
     Logger.info("voip mic enabled: #{enabled}")
-    socket = socket |> assign(:voip_mic_enabled, enabled)
-    |> push_event("toggle_mic", %{enabled: enabled})
+
+    socket =
+      socket
+      |> assign(:voip_mic_enabled, enabled)
+      |> push_event("toggle_mic", %{enabled: enabled})
 
     {:noreply, socket}
   end
 
   def handle_event("voip_mic_enabled", %{"state" => state} = _params, socket) do
-
     socket = socket |> assign(:voip_mic_enabled, state)
 
     {:noreply, socket}
   end
 
+  def handle_event("toggle_software_nr", _params, socket) do
+    enabled = !socket.assigns.software_nr_enabled
+    updated_enabled = RNNoisePort.set_enabled(enabled)
+
+    socket =
+      socket
+      |> assign(:software_nr_enabled, updated_enabled)
+
+    {:noreply, socket}
+  end
+
   def handle_event("direct_frequency_entry", %{"freq" => freq} = params, socket) do
-    Logger.warn("frequency entry: #{inspect params}")
+    Logger.warn("frequency entry: #{inspect(params)}")
     conn = socket.assigns.radio_connection
 
     parsed_freq = FrequencyEntryParser.parse(freq)
@@ -247,10 +272,10 @@ defmodule Open890Web.Live.Radio do
     case socket.assigns.radio_state.active_receiver do
       :a ->
         conn |> ConnectionCommands.cmd("FA#{parsed_freq}")
+
       :b ->
         conn |> ConnectionCommands.cmd("FB#{parsed_freq}")
     end
-
 
     {:noreply, socket}
   end
@@ -273,11 +298,12 @@ defmodule Open890Web.Live.Radio do
   end
 
   def handle_event("toggle_band_selector", _params, socket) do
-    socket = if socket.assigns.display_band_selector do
-      close_modals(socket)
-    else
-      open_band_selector(socket)
-    end
+    socket =
+      if socket.assigns.display_band_selector do
+        close_modals(socket)
+      else
+        open_band_selector(socket)
+      end
 
     {:noreply, socket}
   end
@@ -317,18 +343,42 @@ defmodule Open890Web.Live.Radio do
   def handle_event("window_keydown", %{"key" => key} = params, socket) do
     Logger.debug("live/radio.ex: window_keydown: #{inspect(params)}")
 
+    ctrl_down = event_flag(params, "ctrlKey")
+    shift_down = event_flag(params, "shiftKey")
+    alt_down = event_flag(params, "altKey")
+    meta_down = event_flag(params, "metaKey")
+
     conn = socket.assigns.radio_connection
+    normalized_key = normalize_key(key)
 
-    case key do
-      "]" ->
-        conn |> ConnectionCommands.freq_change(:up)
+    socket =
+      cond do
+        ctrl_down and shift_down and normalized_key in ["l", "u", "c", "a", "f"] ->
+          conn |> ConnectionCommands.cmd(mode_shortcut_cmd(normalized_key))
+          socket
 
-      "[" ->
-        conn |> ConnectionCommands.freq_change(:down)
+        meta_down and shift_down and normalized_key == "e" ->
+          open_band_selector(socket)
 
-      _ ->
-        :ok
-    end
+        alt_down and shift_down and !socket.assigns.ptt_hotkey_active and
+            socket.assigns.radio_state.tx_state == :off ->
+          conn |> ConnectionCommands.cmd("TX0")
+          socket |> assign(:ptt_hotkey_active, true)
+
+        true ->
+          case key do
+            "]" ->
+              conn |> ConnectionCommands.freq_change(:up)
+
+            "[" ->
+              conn |> ConnectionCommands.freq_change(:down)
+
+            _ ->
+              :ok
+          end
+
+          socket
+      end
 
     {:noreply, socket}
   end
@@ -346,6 +396,17 @@ defmodule Open890Web.Live.Radio do
 
   def handle_event("window_keyup", %{"key" => key} = params, socket) do
     Logger.debug("live/radio.ex: window_keyup: #{inspect(params)}")
+
+    alt_shift_down = event_flag(params, "altKey") && event_flag(params, "shiftKey")
+
+    socket =
+      if socket.assigns.ptt_hotkey_active && !alt_shift_down do
+        socket.assigns.radio_connection |> ConnectionCommands.cmd("RX")
+        socket |> assign(:ptt_hotkey_active, false)
+      else
+        socket
+      end
+
     socket = handle_keyboard_state(socket.assigns.keyboard_entry_state, key, socket)
 
     {:noreply, socket}
@@ -482,9 +543,9 @@ defmodule Open890Web.Live.Radio do
   end
 
   def handle_event("power_level_changed", %{"value" => power_level} = _params, socket) do
-    Logger.info("power_level_changed: #{inspect power_level}")
+    Logger.info("power_level_changed: #{inspect(power_level)}")
 
-    power_level = (power_level / 255.0) * 100 |> round()
+    power_level = (power_level / 255.0 * 100) |> round()
 
     socket.assigns.radio_connection
     |> ConnectionCommands.set_power_level(power_level)
@@ -493,9 +554,10 @@ defmodule Open890Web.Live.Radio do
   end
 
   def handle_event("mic_audio", params, socket) do
-    mic_data = params["data"]
-    |> String.split(" ")
-    |> Enum.map(&String.to_integer/1)
+    mic_data =
+      params["data"]
+      |> String.split(" ")
+      |> Enum.map(&String.to_integer/1)
 
     socket.assigns.radio_connection
     |> RadioConnection.send_mic_audio(mic_data)
@@ -554,6 +616,39 @@ defmodule Open890Web.Live.Radio do
       "ui tabs"
     else
       "ui tabs hidden"
+    end
+  end
+
+  defp mode_shortcut_cmd("l"), do: "MD1"
+  defp mode_shortcut_cmd("u"), do: "MD2"
+  defp mode_shortcut_cmd("c"), do: "MD3"
+  defp mode_shortcut_cmd("a"), do: "MD5"
+  defp mode_shortcut_cmd("f"), do: "MD4"
+
+  defp normalize_key(key) when is_binary(key) do
+    key
+    |> String.downcase()
+    |> String.trim()
+  end
+
+  defp normalize_key(_), do: ""
+
+  defp event_flag(params, field) do
+    case Map.get(params, field) do
+      true ->
+        true
+
+      "true" ->
+        true
+
+      1 ->
+        true
+
+      "1" ->
+        true
+
+      _ ->
+        false
     end
   end
 

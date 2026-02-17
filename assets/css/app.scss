@@ -1162,3 +1162,20 @@ button.bandscopePanel.toggle {
     cursor: text;
   }
 }
+
+@media only screen and (max-width: 767px) {
+  .topBar .top-indicator {
+    white-space: normal;
+    margin-bottom: 0.4rem;
+  }
+
+  .topBar .ui.button {
+    width: 100%;
+    text-align: left;
+  }
+
+  .topBar .audio-input-select.ui.dropdown,
+  .topBar .audio-output-select.ui.dropdown {
+    min-width: 100%;
+  }
+}

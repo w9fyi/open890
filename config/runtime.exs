@@ -23,10 +23,39 @@ if config_env() in [:dev, :prod] do
 
   config :open890, Open890.UDPAudioServer, port: udp_port
 
-  Logger.info("Configured OPEN890_HOST: #{inspect(host)}, OPEN890_PORT: #{inspect(port)}, OPEN890_UDP_PORT: #{inspect(udp_port)}")
+  rnnoise_enabled =
+    case System.get_env("OPEN890_RNNOISE_ENABLED", "false") |> String.downcase() do
+      "1" -> true
+      "true" -> true
+      "yes" -> true
+      "on" -> true
+      _ -> false
+    end
+
+  rnnoise_timeout_ms =
+    System.get_env("OPEN890_RNNOISE_TIMEOUT_MS", "30")
+    |> String.to_integer()
+    |> max(5)
+    |> min(1000)
+
+  rnnoise_executable =
+    System.get_env(
+      "OPEN890_RNNOISE_BIN",
+      Path.expand("../priv/bin/open890_rnnoise_filter", __DIR__)
+    )
+
+  config :open890, Open890.RNNoisePort,
+    enabled: rnnoise_enabled,
+    executable: rnnoise_executable,
+    timeout_ms: rnnoise_timeout_ms
+
+  Logger.info(
+    "Configured OPEN890_HOST: #{inspect(host)}, OPEN890_PORT: #{inspect(port)}, OPEN890_UDP_PORT: #{inspect(udp_port)}, OPEN890_RNNOISE_ENABLED: #{inspect(rnnoise_enabled)}"
+  )
 
   config :open890, Open890.RadioConnectionRepo, database: :"db/radio_connections.dets"
 else
   config :open890, Open890.UDPAudioServer, port: 60001
+  config :open890, Open890.RNNoisePort, enabled: false, timeout_ms: 30
   config :open890, Open890.RadioConnectionRepo, database: :"db/radio_connections_test.dets"
 end

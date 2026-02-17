@@ -1,6 +1,12 @@
-<div id="radio" class={radio_classes(@debug)} _phx-hook="RadioKeyboard" _tabindex="0" phx-window-keydown="window_keydown" phx-window-keyup="window_keyup">
-
-  <%#-- disabled --%>
+<div
+  id="radio"
+  class={radio_classes(@debug)}
+  _phx-hook="RadioKeyboard"
+  _tabindex="0"
+  phx-window-keydown="window_keydown"
+  phx-window-keyup="window_keyup"
+>
+  
   <%= if false && @display_screen_id != 0 do %>
     <div id="menuModal" class="ui active modal">
       <div class="header">
@@ -10,7 +16,7 @@
         <h2 class="header">Menu #<%= @display_screen_id %></h2>
         <div class="ui vertical stackable attached fluid menu">
           <!-- render_menu_items(@display_screen_id) -->
-          <%=# render_menu_items(@display_screen_id) %>
+          <%= # render_menu_items(@display_screen_id) %>
         </div>
       </div>
     </div>
@@ -19,7 +25,6 @@
   <%= if @display_band_selector do %>
     <div class="ui active page top aligned page dimmer" _phx-click="dimmer_clicked">
       <div id="BandModal" class="ui active modal">
-
         <div class="header">
           <div class="ui grid">
             <div class="row">
@@ -27,7 +32,13 @@
                 <h1 class="band-modal-header">Direct Frequency Entry</h1>
               </div>
               <div class="four wide right aligned column">
-                <button type="button" id="BandModalClose" class="ui icon button" phx-click="toggle_band_selector" aria-label="Close direct frequency entry">
+                <button
+                  type="button"
+                  id="BandModalClose"
+                  class="ui icon button"
+                  phx-click="toggle_band_selector"
+                  aria-label="Close direct frequency entry"
+                >
                   <i class="close icon"></i>
                 </button>
               </div>
@@ -37,32 +48,41 @@
 
         <div class="content">
           <div class="ui padded grid">
-
             <div class="row">
               <div class="column">
-                <form class="ui form" id="DirectFrequencyEntryForm" phx-hook="DirectFrequencyEntryForm" _phx-submit="direct_frequency_entry">
-
+                <form
+                  class="ui form"
+                  id="DirectFrequencyEntryForm"
+                  phx-hook="DirectFrequencyEntryForm"
+                  _phx-submit="direct_frequency_entry"
+                >
                   <div class="ui grid">
                     <div class="six wide column">
                       <div class="">
-                        <label for="direct-frequency-entry-field" class="sr-only">Direct frequency entry</label>
+                        <label for="direct-frequency-entry-field" class="sr-only">
+                          Direct frequency entry
+                        </label>
                         <input
                           id="direct-frequency-entry-field"
                           type="text"
                           name="freq"
                           value={format_raw_frequency(@radio_state.active_frequency)}
-                          />
+                        />
                       </div>
                     </div>
 
                     <div class="middle aligned column">
                       <div class="ui input">
-                        <button id="direct-frequency-entry-submit" class="ui huge regular button" type="button">ENT</button>
+                        <button
+                          id="direct-frequency-entry-submit"
+                          class="ui huge regular button"
+                          type="button"
+                        >
+                          ENT
+                        </button>
                       </div>
                     </div>
-
                   </div>
-
                 </form>
               </div>
             </div>
@@ -75,15 +95,13 @@
               </div>
             </div>
           </div>
-
-
         </div>
-      </div> <!-- bandmodal -->
+      </div>
+      <!-- bandmodal -->
     </div>
   <% end %>
   <!-- top bar -->
-
-  <div class="computer only tablet only row topBar">
+  <div class="row topBar">
     <div class="four wide column">
       <div class="ui grid">
         <div class="four wide column top-indicator ant_indicator">
@@ -123,91 +141,156 @@
         <div class="six wide column top-indicator">
           <!-- connection status -->
           <%= if connection_startable?(@connection_state) do %>
-            <button type="button" class="ui small button" phx-click="start_connection" data-tooltip="Start connection" data-position="bottom center">
+            <button
+              type="button"
+              class="ui small button"
+              phx-click="start_connection"
+              data-tooltip="Start connection"
+              data-position="bottom center"
+            >
               <i class="play circle outline icon"></i>
               <span class="secondaryText">
                 <%= format_connection_state(@connection_state) %>
               </span>
             </button>
           <% else %>
-            <button type="button" class="ui small black button" phx-click="stop_connection" data-tooltip="Stop connection" data-position="bottom center">
+            <button
+              type="button"
+              class="ui small black button"
+              phx-click="stop_connection"
+              data-tooltip="Stop connection"
+              data-position="bottom center"
+            >
               <i class="stop circle outline icon"></i>
               <span class="secondaryText">
                 <%= format_connection_state(@connection_state) %>
               </span>
             </button>
           <% end %>
-
         </div>
 
         <div class="three wide column top-indicator">
           <!-- audio stream status -->
-
           <%= if @radio_state.voip_available do %>
-
             <div id="audio-recorder" phx-hook="AudioRecorder">
               <VoipButtons.mic_button enabled={@voip_mic_enabled} />
             </div>
           <% end %>
-            <div id="audio-input-device" class="audio-input-device" phx-hook="AudioInputDevice">
-              <label class="audio-input-label secondaryText" for="audio-input-select">Microphone</label>
-              <select id="audio-input-select" class="ui mini dropdown audio-input-select">
-                <option value="default">System Default</option>
-              </select>
-              <span class="secondaryText audio-input-status">Input: System Default</span>
-            </div>
+          <div id="audio-input-device" class="audio-input-device" phx-hook="AudioInputDevice">
+            <label class="audio-input-label secondaryText" for="audio-input-select">
+              Microphone
+            </label>
+            <select id="audio-input-select" class="ui mini dropdown audio-input-select">
+              <option value="default">System Default</option>
+            </select>
+            <span class="secondaryText audio-input-status" role="status" aria-live="polite">
+              Input: System Default
+            </span>
+          </div>
         </div>
         <div class="three wide column top-indicator">
           <%= if @radio_state.voip_available do %>
-
             <div phx-hook="AudioStream" id="AudioStreamPlayer">
               <%= if @connection_state == :up && @radio_state.voip_enabled do %>
-                <button type="button" class="ui small black button" phx-click="stop_voip" data-tooltip="Stop VOIP audio" data-position="bottom center">
-                  <span class="secondaryText">
-                    VOIP Audio: Streaming &nbsp;
-                    <i class="icon small sync rotating"></i>
+                <button
+                  type="button"
+                  class="ui small black button"
+                  phx-click="stop_voip"
+                  aria-label="Stop VOIP audio stream"
+                  data-tooltip="Stop VOIP audio"
+                  data-position="bottom center"
+                >
+                  <span
+                    class="secondaryText"
+                    id="voip-audio-state"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    VOIP Audio: Streaming &nbsp; <i class="icon small sync rotating"></i>
                   </span>
                 </button>
               <% else %>
                 <%= if @connection_state == :up do %>
-                  <button type="button" class="ui small icon black button" phx-click="start_voip" data-tooltip="Start VOIP Audio" data-position="bottom center">
-                    <span class="secondaryText">VOIP Audio: Stopped</span>
+                  <button
+                    type="button"
+                    class="ui small icon black button"
+                    phx-click="start_voip"
+                    aria-label="Start VOIP audio stream"
+                    data-tooltip="Start VOIP Audio"
+                    data-position="bottom center"
+                  >
+                    <span
+                      class="secondaryText"
+                      id="voip-audio-state"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      VOIP Audio: Stopped
+                    </span>
                   </button>
                 <% else %>
-                  <button type="button" class="ui small icon black button disabled" disabled>
-                    <span class="secondaryText">VOIP Audio: Stopped</span>
+                  <button
+                    type="button"
+                    class="ui small icon black button disabled"
+                    disabled
+                    aria-disabled="true"
+                    aria-label="VOIP audio stream is stopped"
+                  >
+                    <span
+                      class="secondaryText"
+                      id="voip-audio-state"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      VOIP Audio: Stopped
+                    </span>
                   </button>
                 <% end %>
               <% end %>
             </div>
-
           <% else %>
             <%= if @connection_state == :up do %>
-              <div class="ui icon small black button" data-tooltip="Enable via MENU ▸ KNS ▸ CONFIG ▸ Built-in VOIP: ON" data-position="bottom center">
-                <i class="icon grey exclamation triangle"></i>
-                &nbsp;
-                <span class="secondaryText">VOIP Audio: Not available</span>
-              </div>
+              <button
+                type="button"
+                class="ui small black button disabled"
+                disabled
+                aria-disabled="true"
+                aria-label="VOIP audio not available. Enable Built-in VOIP in radio KNS config."
+                data-tooltip="Enable via MENU ▸ KNS ▸ CONFIG ▸ Built-in VOIP: ON"
+                data-position="bottom center"
+              >
+                <i class="icon grey exclamation triangle" aria-hidden="true"></i>
+                <span class="secondaryText" role="status" aria-live="polite">
+                  VOIP Audio: Not available
+                </span>
+              </button>
             <% end %>
           <% end %>
           <div id="audio-output-device" class="audio-output-device" phx-hook="AudioOutputDevice">
-            <label class="audio-output-label secondaryText" for="audio-output-select">Audio Output</label>
+            <label class="audio-output-label secondaryText" for="audio-output-select">
+              Audio Output
+            </label>
             <select id="audio-output-select" class="ui mini dropdown audio-output-select">
               <option value="default">System Default</option>
             </select>
-            <span class="secondaryText audio-output-status">Output: System Default</span>
+            <span class="secondaryText audio-output-status" role="status" aria-live="polite">
+              Output: System Default
+            </span>
           </div>
-
         </div>
 
         <div class="two wide right aligned column top-indicator">
           <%= if @radio_state.antenna_state.drv_enabled, do: "DRV" %>
 
           <%= if @radio_state.power_level do %>
-            <%= @radio_state.power_level %><%= if @radio_state.antenna_state.drv_enabled do %>%<% else %>W<% end %>
+            <%= @radio_state.power_level %>
+            <%= if @radio_state.antenna_state.drv_enabled do %>
+              %
+            <% else %>
+              W
+            <% end %>
           <% end %>
         </div>
-
       </div>
     </div>
 
@@ -217,9 +300,7 @@
           <%= if RadioState.effective_active_mode(@radio_state) in [:cw, :cw_r] && @radio_state.cw_key_speed do %>
             <%= @radio_state.cw_key_speed %>WPM
           <% else %>
-
             <.proc_button enabled={@radio_state.proc_enabled} />
-
 
             <%= if @radio_state.proc_enabled do %>
               <span>PROC OUT: <%= @radio_state.proc_output %></span>
@@ -232,7 +313,9 @@
         </div>
         <div class="eight wide column right aligned top-indicator">
           <%= if RadioState.effective_active_mode(@radio_state) in [:cw, :cw_r] && @radio_state.cw_delay do %>
-            <%= if @radio_state.cw_delay == 0, do: "FULL-BK", else: "DELAY: #{@radio_state.cw_delay}" %>
+            <%= if @radio_state.cw_delay == 0,
+              do: "FULL-BK",
+              else: "DELAY: #{@radio_state.cw_delay}" %>
           <% end %>
         </div>
       </div>
@@ -241,39 +324,68 @@
 
   <div class="computer only tablet only row">
     <div class="four wide column">
-
       <div class="row">
         <div class="column">
-          <Meter.meter s_meter={@radio_state.s_meter} alc_meter={@radio_state.alc_meter} swr_meter={@radio_state.swr_meter} />
+          <Meter.meter
+            s_meter={@radio_state.s_meter}
+            alc_meter={@radio_state.alc_meter}
+            swr_meter={@radio_state.swr_meter}
+          />
         </div>
       </div>
 
       <div class="one column row">
         <div class="column">
           <%= if @radio_state.audio_gain do %>
-            <Slider.slider id="af-slider" label="AF" padded_top value={@radio_state.audio_gain} click="audio_gain_changed" wheel="adjust_audio_gain" enabled={true} />
+            <Slider.slider
+              id="af-slider"
+              label="AF"
+              padded_top
+              value={@radio_state.audio_gain}
+              click="audio_gain_changed"
+              wheel="adjust_audio_gain"
+              enabled={true}
+            />
           <% end %>
         </div>
         <div class="column">
           <%= if @radio_state.rf_gain do %>
-            <Slider.slider id="rf-slider" label="RF" padded_top value={@radio_state.rf_gain} click="rf_gain_changed" wheel="adjust_rf_gain" enabled={true} />
+            <Slider.slider
+              id="rf-slider"
+              label="RF"
+              padded_top
+              value={@radio_state.rf_gain}
+              click="rf_gain_changed"
+              wheel="adjust_rf_gain"
+              enabled={true}
+            />
           <% end %>
         </div>
         <div class="column">
           <%= if @radio_state.squelch do %>
-            <Slider.slider id="sql-slider" label="SQL" padded_top value={@radio_state.squelch} click="sql_changed" wheel="adjust_sql" enabled={true} />
+            <Slider.slider
+              id="sql-slider"
+              label="SQL"
+              padded_top
+              value={@radio_state.squelch}
+              click="sql_changed"
+              wheel="adjust_sql"
+              enabled={true}
+            />
           <% end %>
         </div>
       </div>
     </div>
 
     <div class="eight wide column">
-
       <div class="ui grid">
         <div class="row">
           <div class="six wide column"></div>
           <div class="four wide column">
-            <BusyTxIndicator.busy_tx tx_state={@radio_state.tx_state} busy_enabled={@radio_state.busy_enabled} />
+            <BusyTxIndicator.busy_tx
+              tx_state={@radio_state.tx_state}
+              busy_enabled={@radio_state.busy_enabled}
+            />
           </div>
           <div class="six wide column"></div>
         </div>
@@ -289,7 +401,8 @@
             <RitXit.offset_indicator
               rit_enabled={@radio_state.rit_enabled}
               xit_enabled={@radio_state.xit_enabled}
-              offset={@radio_state.rit_xit_offset} />
+              offset={@radio_state.rit_xit_offset}
+            />
           </div>
           <div class="seven wide left aligned column">
             <RitXit.rit_button enabled={@radio_state.rit_enabled} />
@@ -299,26 +412,25 @@
         </div>
 
         <div id="frequencyDisplay" class="ui row top aligned">
-            <div class="eight column row">
-
-              <VFODisplayComponent.vfo_display
-                 active_frequency={RadioState.effective_active_frequency(@radio_state)}
-                 active_mode={RadioState.effective_active_mode(@radio_state)}
-                 active_receiver={@radio_state.active_receiver}
-                 band_register_state={@radio_state.band_register_state}
-                 inactive_frequency={RadioState.effective_inactive_frequency(@radio_state)}
-                 inactive_mode={RadioState.effective_inactive_mode(@radio_state)}
-                 inactive_receiver={@radio_state.inactive_receiver}
-                 memory_channel_number={@radio_state.memory_channel_number}
-                 notch_state={@radio_state.notch_state}
-                 split_enabled={@radio_state.split_enabled}
-                 transverter_state={@radio_state.transverter_state}
-                 tx_state={@radio_state.tx_state}
-                 vfo_memory_state={@radio_state.vfo_memory_state}
-              />
-            </div>
-        </div> <!-- frequencyDisplay -->
-
+          <div class="eight column row">
+            <VFODisplayComponent.vfo_display
+              active_frequency={RadioState.effective_active_frequency(@radio_state)}
+              active_mode={RadioState.effective_active_mode(@radio_state)}
+              active_receiver={@radio_state.active_receiver}
+              band_register_state={@radio_state.band_register_state}
+              inactive_frequency={RadioState.effective_inactive_frequency(@radio_state)}
+              inactive_mode={RadioState.effective_inactive_mode(@radio_state)}
+              inactive_receiver={@radio_state.inactive_receiver}
+              memory_channel_number={@radio_state.memory_channel_number}
+              notch_state={@radio_state.notch_state}
+              split_enabled={@radio_state.split_enabled}
+              transverter_state={@radio_state.transverter_state}
+              tx_state={@radio_state.tx_state}
+              vfo_memory_state={@radio_state.vfo_memory_state}
+            />
+          </div>
+        </div>
+        <!-- frequencyDisplay -->
         <div class="row equal width">
           <div class="column">
             <.memory_transfer_button fluid />
@@ -339,7 +451,6 @@
     <div class="four wide column right-panel">
       <div class="row">
         <div class="right floated column audio-scope-panel">
-
           <AudioScope.audio_scope
             active_if_filter={@radio_state.active_if_filter}
             active_mode={RadioState.effective_active_mode(@radio_state)}
@@ -348,17 +459,19 @@
             roofing_filter_data={@radio_state.roofing_filter_data}
             notch_state={@radio_state.notch_state}
             filter_mode={RadioState.filter_mode(@radio_state)}
-            theme={@theme}></AudioScope.audio_scope>
+            theme={@theme}
+          >
+          </AudioScope.audio_scope>
 
           <div class="scopeButtonsContainer">
             <%= if false && RadioState.effective_active_mode(@radio_state) in [:usb, :lsb, :usb_d, :lsb_d] do %>
               <.ssb_shift_width_button
                 active_mode={RadioState.effective_active_mode(@radio_state)}
                 ssb_filter_mode={@radio_state.ssb_filter_mode}
-                ssb_data_filter_mode={@radio_state.ssb_data_filter_mode} />
+                ssb_data_filter_mode={@radio_state.ssb_data_filter_mode}
+              />
             <% end %>
 
-            <%# shared filter buttons %>
             <.filter_buttons active_if_filter={@radio_state.active_if_filter} />
 
             <%= if RadioState.effective_active_mode(@radio_state) in [:cw, :cw_r, :fsk, :fsk_r] do %>
@@ -372,25 +485,28 @@
                 <.apf_button value={@radio_state.apf_enabled} />
               </div>
             <% end %>
-          </div> <!-- scope buttons container -->
-
-        </div> <!-- column audio-scope-panel -->
-
-      </div> <!-- row -->
-
-    </div> <!-- right panel -->
-
-  </div> <!-- row -->
-
+          </div>
+          <!-- scope buttons container -->
+        </div>
+        <!-- column audio-scope-panel -->
+      </div>
+      <!-- row -->
+    </div>
+    <!-- right panel -->
+  </div>
+  <!-- row -->
   <div class="bandscopeContainer">
-
     <div class={panel_classes(@left_panel_open)}>
       <!-- left side panel contents -->
 
       <!-- tab buttons -->
       <div class="row">
         <div class="column">
-          <div class="ui secondary inverted pointing three item menu" role="tablist" aria-label="Left control panel tabs">
+          <div
+            class="ui secondary inverted pointing three item menu"
+            role="tablist"
+            aria-label="Left control panel tabs"
+          >
             <button
               type="button"
               class={tab_classes("ant", @active_tab)}
@@ -399,7 +515,10 @@
               aria-selected={@active_tab == "ant"}
               aria-controls="tab-panel-ant"
               phx-click="set_tab"
-              phx-value-tab="ant">TX/ANT</button>
+              phx-value-tab="ant"
+            >
+              TX/ANT
+            </button>
             <button
               type="button"
               class={tab_classes("txrx", @active_tab)}
@@ -408,7 +527,10 @@
               aria-selected={@active_tab == "txrx"}
               aria-controls="tab-panel-txrx"
               phx-click="set_tab"
-              phx-value-tab="txrx">RX</button>
+              phx-value-tab="txrx"
+            >
+              RX
+            </button>
             <button
               type="button"
               class={tab_classes("scope", @active_tab)}
@@ -417,7 +539,10 @@
               aria-selected={@active_tab == "scope"}
               aria-controls="tab-panel-scope"
               phx-click="set_tab"
-              phx-value-tab="scope">Scope</button>
+              phx-value-tab="scope"
+            >
+              Scope
+            </button>
           </div>
         </div>
       </div>
@@ -425,11 +550,16 @@
       <div class="row">
         <div class="column">&nbsp;</div>
       </div>
-
       <!-- tab contents -->
       <div class="row">
         <div class="column">
-          <div id="tab-panel-ant" class={tab_panel_classes("ant", @active_tab)} role="tabpanel" aria-labelledby="tab-ant" tabindex="0">
+          <div
+            id="tab-panel-ant"
+            class={tab_panel_classes("ant", @active_tab)}
+            role="tabpanel"
+            aria-labelledby="tab-ant"
+            tabindex="0"
+          >
             <div class="ui two column grid row">
               <div class="column">
                 <.atu_button value={@radio_state.tuner_state} fluid />
@@ -468,22 +598,25 @@
             <div class="ui one column grid row">
               <div class="center aligned column">
                 RF Power
-
                 <Slider.slider
                   id="rf-power-slider"
-                   label=""
-                   value={@radio_state.power_level}
-                   max_value={100}
-                   click="power_level_changed"
-                   wheel="adjust_power_level" />
+                  label=""
+                  value={@radio_state.power_level}
+                  max_value={100}
+                  click="power_level_changed"
+                  wheel="adjust_power_level"
+                />
               </div>
             </div>
-
-
           </div>
 
-          <div id="tab-panel-txrx" class={tab_panel_classes("txrx", @active_tab)} role="tabpanel" aria-labelledby="tab-txrx" tabindex="0">
-
+          <div
+            id="tab-panel-txrx"
+            class={tab_panel_classes("txrx", @active_tab)}
+            role="tabpanel"
+            aria-labelledby="tab-txrx"
+            tabindex="0"
+          >
             <div class="ui two column grid row">
               <div class="column">
                 <.pre_button value={@radio_state.rf_pre} fluid />
@@ -506,7 +639,14 @@
               </div>
 
               <div class="column">
-                <.bc_button value={@radio_state.bc} active_mode={RadioState.effective_active_mode(@radio_state)} fluid />
+                <.software_nr_button enabled={@software_nr_enabled} />
+              </div>
+              <div class="column">
+                <.bc_button
+                  value={@radio_state.bc}
+                  active_mode={RadioState.effective_active_mode(@radio_state)}
+                  fluid
+                />
               </div>
 
               <div class="column">
@@ -535,18 +675,26 @@
                   value={@radio_state.notch_state.frequency}
                   click="notch_changed"
                   wheel="adjust_notch"
-                  enabled={@radio_state.notch_state.enabled} />
+                  enabled={@radio_state.notch_state.enabled}
+                />
               </div>
             </div>
           </div>
 
-          <div id="tab-panel-scope" class={tab_panel_classes("scope", @active_tab)} role="tabpanel" aria-labelledby="tab-scope" tabindex="0">
+          <div
+            id="tab-panel-scope"
+            class={tab_panel_classes("scope", @active_tab)}
+            role="tabpanel"
+            aria-labelledby="tab-scope"
+            tabindex="0"
+          >
             <div class="column">
               <.scope_mode_button fluid band_scope_mode={@radio_state.band_scope_mode} />
             </div>
 
             <div class="column">
-              <.scope_range_button fluid
+              <.scope_range_button
+                fluid
                 band_scope_mode={@radio_state.band_scope_mode}
                 band_scope_span={@radio_state.band_scope_span}
                 band_scope_fixed_range_number={@radio_state.band_scope_fixed_range_number}
@@ -579,7 +727,12 @@
 
             <div class="column">
               <%= if @radio_state.band_scope_mode in [:center, :auto_scroll] do %>
-                <.band_scope_expand_button band_scope_expand={@radio_state.band_scope_expand} band_scope_mode={@radio_state.band_scope_mode} band_scope_edges={@radio_state.band_scope_edges} fluid />
+                <.band_scope_expand_button
+                  band_scope_expand={@radio_state.band_scope_expand}
+                  band_scope_mode={@radio_state.band_scope_mode}
+                  band_scope_edges={@radio_state.band_scope_edges}
+                  fluid
+                />
               <% end %>
             </div>
 
@@ -595,55 +748,63 @@
               <.pop_out_bandscope_button radio_connection={@radio_connection} fluid />
             </div>
           </div>
-
         </div>
       </div>
-
       <!-- macros -->
       <%= if @__ui_macros != %{} do %>
         <h4>Macros</h4>
         <div class="ui two column grid row">
           <%= for %{"label" => name} <- @__ui_macros do %>
             <div class="column">
-              <button type="button" class="ui black fluid button" phx-click="run_macro" phx-value-name={name}><%= name %></button>
+              <button
+                type="button"
+                class="ui black fluid button"
+                phx-click="run_macro"
+                phx-value-name={name}
+              >
+                <%= name %>
+              </button>
             </div>
           <% end %>
         </div>
       <% end %>
-
     </div>
 
-    <button type="button" class="bandscopePanel toggle" phx-click="toggle_panel" aria-label="Toggle left control panel"></button>
+    <button
+      type="button"
+      class="bandscopePanel toggle"
+      phx-click="toggle_panel"
+      aria-label="Toggle left control panel"
+    >
+    </button>
 
     <div class="bandscopePanel right">
-      <%# When changing anything here, make sure the changes are reflected in the pop-out bandscope as well %>
-
+      
       <BandScope.bandscope
-         active_mode={RadioState.effective_active_mode(@radio_state)}
-         band_scope_data={@band_scope_data}
-         band_scope_edges={RadioState.effective_band_edges(@radio_state)}
-         band_scope_mode={@radio_state.band_scope_mode}
-         band_scope_span={@radio_state.band_scope_span}
-         draw_interval={@waterfall_draw_interval}
-         effective_active_frequency={RadioState.effective_active_frequency(@radio_state)}
-         effective_inactive_frequency={RadioState.effective_inactive_frequency(@radio_state)}
-         filter_mode={RadioState.filter_mode(@radio_state)}
-         filter_state={@radio_state.filter_state}
-         inactive_frequency={@radio_state.inactive_frequency}
-         lock_enabled={@radio_state.lock_enabled}
-         markers={@markers}
-         rit_xit_offset={@radio_state.rit_xit_offset}
-         rx_banner_frequency={RadioState.rx_banner_frequency(@radio_state)}
-         spectrum_scale={@spectrum_scale}
-         split_enabled={@radio_state.split_enabled}
-         tf_set_enabled={@radio_state.tf_set_enabled}
-         tf_set_marker_frequency={@radio_state.tf_set_marker_frequency}
-         theme={@theme}
-         tx_banner_frequency={RadioState.tx_banner_frequency(@radio_state)}
-         xit_enabled={@radio_state.xit_enabled}
-       />
+        active_mode={RadioState.effective_active_mode(@radio_state)}
+        band_scope_data={@band_scope_data}
+        band_scope_edges={RadioState.effective_band_edges(@radio_state)}
+        band_scope_mode={@radio_state.band_scope_mode}
+        band_scope_span={@radio_state.band_scope_span}
+        draw_interval={@waterfall_draw_interval}
+        effective_active_frequency={RadioState.effective_active_frequency(@radio_state)}
+        effective_inactive_frequency={RadioState.effective_inactive_frequency(@radio_state)}
+        filter_mode={RadioState.filter_mode(@radio_state)}
+        filter_state={@radio_state.filter_state}
+        inactive_frequency={@radio_state.inactive_frequency}
+        lock_enabled={@radio_state.lock_enabled}
+        markers={@markers}
+        rit_xit_offset={@radio_state.rit_xit_offset}
+        rx_banner_frequency={RadioState.rx_banner_frequency(@radio_state)}
+        spectrum_scale={@spectrum_scale}
+        split_enabled={@radio_state.split_enabled}
+        tf_set_enabled={@radio_state.tf_set_enabled}
+        tf_set_marker_frequency={@radio_state.tf_set_marker_frequency}
+        theme={@theme}
+        tx_banner_frequency={RadioState.tx_banner_frequency(@radio_state)}
+        xit_enabled={@radio_state.xit_enabled}
+      />
     </div>
   </div>
-
-</div> <!-- end radio -->
-
+</div>
+<!-- end radio -->
