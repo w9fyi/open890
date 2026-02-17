@@ -21,6 +21,7 @@ defmodule Open890Web.Live.RadioSocketState do
     {:ft8_enabled, false},
     {:ft8_status, %{}},
     {:ft8_decodes, []},
+    {:ft8_last_tuned, nil},
     {:spectrum_scale, 1.0},
     {:theme, "kenwood"},
     {:voip_mic_enabled, false},

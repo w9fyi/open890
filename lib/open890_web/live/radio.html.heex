@@ -813,21 +813,50 @@
                 </div>
               </div>
 
+              <%= if @ft8_last_tuned do %>
+                <div class="column">
+                  <div class="secondaryText">
+                    <strong>Last Tune:</strong>
+                    <span>
+                      <%= format_raw_frequency(@ft8_last_tuned.target_hz) %> ( <%= if @ft8_last_tuned.delta_hz >=
+                                                                                        0,
+                                                                                      do: "+" %><%= @ft8_last_tuned.delta_hz %> Hz)
+                    </span>
+                  </div>
+                </div>
+              <% end %>
+
               <div class="column">
                 <div class="ui relaxed list">
                   <%= if Enum.empty?(@ft8_decodes) do %>
                     <div class="item secondaryText">No decodes yet.</div>
                   <% else %>
                     <%= for decode <- @ft8_decodes do %>
-                      <div class="item">
-                        <span class="secondaryText">
-                          <%= Map.get(decode, :timestamp, Map.get(decode, "timestamp", "")) %>
-                        </span>
-                        &nbsp;
-                        <span>
-                          <%= Map.get(decode, :text, Map.get(decode, "text", "")) %>
-                        </span>
-                      </div>
+                      <% decode_timestamp =
+                        Map.get(decode, :timestamp, Map.get(decode, "timestamp", "")) %>
+                      <% decode_text = Map.get(decode, :text, Map.get(decode, "text", "")) %>
+                      <% decode_freq_hz =
+                        Map.get(decode, :freq_hz, Map.get(decode, "freq_hz", nil)) %>
+
+                      <%= if is_number(decode_freq_hz) do %>
+                        <button
+                          type="button"
+                          class="ui tiny black fluid button"
+                          phx-click="tune_ft8_decode"
+                          phx-value-freq={decode_freq_hz}
+                          aria-label={"Tune to FT8 decode at #{round(decode_freq_hz)} hertz: #{decode_text}"}
+                        >
+                          <span class="secondaryText"><%= decode_timestamp %></span>
+                          <span>
+                            [<%= round(decode_freq_hz) %> Hz] <%= decode_text %>
+                          </span>
+                        </button>
+                      <% else %>
+                        <div class="item">
+                          <span class="secondaryText"><%= decode_timestamp %></span>
+                          &nbsp; <span><%= decode_text %></span>
+                        </div>
+                      <% end %>
                     <% end %>
                   <% end %>
                 </div>

@@ -320,6 +320,7 @@ export OPEN890_FT8_WINDOW_SECONDS=15
 
 - Toggle **FT8 Decoder: ON**.
 - Watch decode output in the list.
+- Click a decode entry to retune the active VFO to that FT8 audio offset (relative to 1500 Hz).
 
 ### GPL note for real WSJT-X integration
 

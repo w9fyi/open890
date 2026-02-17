@@ -38,6 +38,8 @@ defmodule Open890Web.Live.Radio do
 
   import Open890Web.Components.Buttons
 
+  @ft8_reference_tone_hz 1500.0
+
   @impl true
   def mount(%{"id" => connection_id} = params, _session, socket) do
     Logger.info("LiveView mount: params: #{inspect(params)}")
@@ -299,6 +301,24 @@ defmodule Open890Web.Live.Radio do
 
   def handle_event("clear_ft8_decodes", _params, socket) do
     {:noreply, assign(socket, :ft8_decodes, [])}
+  end
+
+  def handle_event("tune_ft8_decode", %{"freq" => decode_freq}, socket) do
+    with {freq_hz, _rest} <- Float.parse(to_string(decode_freq)),
+         {:ok, tune_info} <- tune_to_ft8_decode(socket, freq_hz) do
+      socket =
+        socket
+        |> clear_ft8_error()
+        |> assign(:ft8_last_tuned, tune_info)
+
+      {:noreply, socket}
+    else
+      {:error, :no_active_frequency} ->
+        {:noreply, socket |> put_ft8_error("No active frequency available to tune")}
+
+      _ ->
+        {:noreply, socket |> put_ft8_error("Invalid FT8 decode frequency")}
+    end
   end
 
   def handle_event("direct_frequency_entry", %{"freq" => freq} = params, socket) do
@@ -606,6 +626,45 @@ defmodule Open890Web.Live.Radio do
   def handle_event(event, params, socket) do
     Logger.warn("Live.Radio: Unknown event: #{event}, params: #{inspect(params)}")
     {:noreply, socket}
+  end
+
+  defp tune_to_ft8_decode(socket, decode_freq_hz) do
+    radio_state = socket.assigns.radio_state
+    connection = socket.assigns.radio_connection
+
+    active_frequency_hz = RadioState.effective_active_frequency(radio_state)
+
+    if is_integer(active_frequency_hz) and active_frequency_hz > 0 do
+      delta_hz = round(decode_freq_hz - @ft8_reference_tone_hz)
+      target_hz = max(active_frequency_hz + delta_hz, 0)
+      target = target_hz |> Integer.to_string() |> String.pad_leading(11, "0")
+
+      case radio_state.active_receiver do
+        :a -> connection |> ConnectionCommands.cmd("FA#{target}")
+        :b -> connection |> ConnectionCommands.cmd("FB#{target}")
+        _ -> :ok
+      end
+
+      {:ok, %{decode_freq_hz: round(decode_freq_hz), delta_hz: delta_hz, target_hz: target_hz}}
+    else
+      {:error, :no_active_frequency}
+    end
+  end
+
+  defp put_ft8_error(socket, message) do
+    ft8_status =
+      socket.assigns.ft8_status
+      |> Map.put(:last_error, message)
+
+    socket |> assign(:ft8_status, ft8_status)
+  end
+
+  defp clear_ft8_error(socket) do
+    ft8_status =
+      socket.assigns.ft8_status
+      |> Map.put(:last_error, nil)
+
+    socket |> assign(:ft8_status, ft8_status)
   end
 
   defp close_modals(socket) do
