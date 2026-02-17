@@ -16,6 +16,8 @@ defmodule Open890Web.Live.RadioSocketState do
     {:projected_active_receiver_location, ""},
     {:radio_connection, nil},
     {:radio_state, %RadioState{}},
+    {:ptt_hotkey_active, false},
+    {:software_nr_enabled, false},
     {:spectrum_scale, 1.0},
     {:theme, "kenwood"},
     {:voip_mic_enabled, false},

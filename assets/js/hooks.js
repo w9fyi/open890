@@ -39,6 +39,42 @@ let Hooks = {
       }
     },
 
+    async requestMicrophonePermission() {
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") {
+        return {
+          ok: false,
+          message: "Microphone permissions are unavailable in this browser"
+        }
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({audio: true})
+        stream.getTracks().forEach((track) => track.stop())
+        return {ok: true}
+      } catch (error) {
+        if (error && error.name === "NotAllowedError") {
+          return {ok: false, message: "Microphone permission denied"}
+        }
+
+        if (error && error.name === "NotFoundError") {
+          return {ok: false, message: "No microphone available"}
+        }
+
+        if (error && error.name === "NotReadableError") {
+          return {ok: false, message: "Microphone is busy or unavailable"}
+        }
+
+        if (error && error.name === "SecurityError") {
+          return {ok: false, message: "Microphone access requires a secure browser context"}
+        }
+
+        return {
+          ok: false,
+          message: error && error.message ? error.message : "Unable to request microphone permission"
+        }
+      }
+    },
+
     async handleMicInputSelection(deviceId) {
       const selectedDeviceId = deviceId || this.selectedDeviceId()
 
@@ -98,6 +134,34 @@ let Hooks = {
         }
       }
 
+      this.onMicButtonClick = (event) => {
+        const button = event.target.closest('button[phx-click="toggle_mic"]')
+
+        if (!button) {
+          return
+        }
+
+        event.preventDefault()
+        event.stopImmediatePropagation()
+
+        const currentlyEnabled = button.getAttribute("aria-pressed") === "true"
+
+        if (currentlyEnabled) {
+          this.pushEvent("toggle_mic", {})
+          return
+        }
+
+        this.requestMicrophonePermission().then((permission) => {
+          if (!permission.ok) {
+            window.alert(permission.message)
+            return
+          }
+
+          this.pushEvent("toggle_mic", {})
+        })
+      }
+
+      this.el.addEventListener("click", this.onMicButtonClick, true)
       window.addEventListener("open890:set-mic-input", this.onSetMicInput)
 
       this.handleEvent("toggle_mic", (event) => {
@@ -117,6 +181,10 @@ let Hooks = {
     destroyed() {
       if (this.onSetMicInput) {
         window.removeEventListener("open890:set-mic-input", this.onSetMicInput)
+      }
+
+      if (this.onMicButtonClick) {
+        this.el.removeEventListener("click", this.onMicButtonClick, true)
       }
 
       this.stopMicCapture()
@@ -361,6 +429,7 @@ let Hooks = {
       this.status = this.el.querySelector(".audio-input-status")
       this.storageKey = "open890.mic_input_device"
       this.defaultOptionLabel = "System Default"
+      this.hasRequestedMicPermission = false
 
       this.onInputResult = (event) => {
         const details = event && event.detail ? event.detail : null
@@ -391,10 +460,49 @@ let Hooks = {
 
       window.addEventListener("open890:mic-input-result", this.onInputResult)
 
+      this.onSelectFocus = async () => {
+        if (!this.select || this.hasRequestedMicPermission) {
+          return
+        }
+
+        this.hasRequestedMicPermission = true
+        const permission = await this.requestMicrophonePermission()
+
+        if (!permission.ok) {
+          this.hasRequestedMicPermission = false
+          this.renderStatus(permission.message)
+          return
+        }
+
+        await this.populateInputDevices(window.localStorage.getItem(this.storageKey) || "default")
+      }
+
       if (this.select) {
-        this.select.addEventListener("change", () => {
+        this.select.addEventListener("focus", this.onSelectFocus)
+        this.select.addEventListener("change", async () => {
           const deviceId = this.select.value || "default"
           window.localStorage.setItem(this.storageKey, deviceId)
+
+          if (deviceId !== "default") {
+            this.hasRequestedMicPermission = true
+            const permission = await this.requestMicrophonePermission()
+
+            if (!permission.ok) {
+              this.hasRequestedMicPermission = false
+              window.dispatchEvent(new CustomEvent("open890:mic-input-result", {
+                detail: {
+                  deviceId,
+                  ok: false,
+                  message: permission.message
+                }
+              }))
+              return
+            }
+
+            await this.populateInputDevices(deviceId)
+            return
+          }
+
           this.dispatchSelection(deviceId)
         })
       }
@@ -410,12 +518,52 @@ let Hooks = {
       if (this.onInputResult) {
         window.removeEventListener("open890:mic-input-result", this.onInputResult)
       }
+
+      if (this.select && this.onSelectFocus) {
+        this.select.removeEventListener("focus", this.onSelectFocus)
+      }
     },
 
     dispatchSelection(deviceId) {
       window.dispatchEvent(new CustomEvent("open890:set-mic-input", {
         detail: {deviceId: deviceId || "default"}
       }))
+    },
+
+    async requestMicrophonePermission() {
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") {
+        return {
+          ok: false,
+          message: "Microphone permissions are unavailable in this browser"
+        }
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({audio: true})
+        stream.getTracks().forEach((track) => track.stop())
+        return {ok: true}
+      } catch (error) {
+        if (error && error.name === "NotAllowedError") {
+          return {ok: false, message: "Microphone permission denied"}
+        }
+
+        if (error && error.name === "NotFoundError") {
+          return {ok: false, message: "No microphone available"}
+        }
+
+        if (error && error.name === "NotReadableError") {
+          return {ok: false, message: "Microphone is busy or unavailable"}
+        }
+
+        if (error && error.name === "SecurityError") {
+          return {ok: false, message: "Microphone access requires a secure browser context"}
+        }
+
+        return {
+          ok: false,
+          message: error && error.message ? error.message : "Unable to request microphone permission"
+        }
+      }
     },
 
     setOptions(options, selectedDeviceId) {
@@ -436,12 +584,12 @@ let Hooks = {
       this.select.value = hasSelectedDevice ? selectedDeviceId : "default"
     },
 
-    async populateInputDevices() {
+    async populateInputDevices(preferredDeviceId = null) {
       if (!this.select) {
         return
       }
 
-      const savedDeviceId = window.localStorage.getItem(this.storageKey) || "default"
+      const savedDeviceId = preferredDeviceId || window.localStorage.getItem(this.storageKey) || "default"
 
       if (!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== "function") {
         this.setOptions([{deviceId: "default", label: this.defaultOptionLabel}], savedDeviceId)
@@ -467,7 +615,10 @@ let Hooks = {
 
         this.setOptions(options, savedDeviceId)
         this.select.disabled = false
-        this.dispatchSelection(this.select.value || "default")
+
+        const selectedDeviceId = this.select.value || "default"
+        window.localStorage.setItem(this.storageKey, selectedDeviceId)
+        this.dispatchSelection(selectedDeviceId)
       } catch (error) {
         console.error("Unable to enumerate microphone devices", error)
         this.setOptions([{deviceId: "default", label: this.defaultOptionLabel}], savedDeviceId)

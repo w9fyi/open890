@@ -20,6 +20,25 @@ let liveSocket = new LiveSocket("/live", Socket, {
   metadata: {
     click: (evt, el) => {
       return {}
+    },
+    keydown: (evt, el) => {
+      return {
+        key: evt.key,
+        ctrlKey: evt.ctrlKey,
+        shiftKey: evt.shiftKey,
+        altKey: evt.altKey,
+        metaKey: evt.metaKey,
+        repeat: evt.repeat
+      }
+    },
+    keyup: (evt, el) => {
+      return {
+        key: evt.key,
+        ctrlKey: evt.ctrlKey,
+        shiftKey: evt.shiftKey,
+        altKey: evt.altKey,
+        metaKey: evt.metaKey
+      }
     }
   }
 })

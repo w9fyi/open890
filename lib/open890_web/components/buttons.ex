@@ -372,6 +372,34 @@ defmodule Open890Web.Components.Buttons do
     """
   end
 
+  attr :enabled, :boolean, required: true
+
+  def software_nr_button(assigns) do
+    ~H"""
+      <%= if @enabled do %>
+        <button
+          type="button"
+          class="ui small green button fluid"
+          phx-click="toggle_software_nr"
+          aria-pressed="true"
+          aria-label="Software noise reduction on. Activate to turn off."
+        >
+          SNR ON
+        </button>
+      <% else %>
+        <button
+          type="button"
+          class="ui small red inverted button fluid"
+          phx-click="toggle_software_nr"
+          aria-pressed="false"
+          aria-label="Software noise reduction off. Activate to turn on."
+        >
+          SNR OFF
+        </button>
+      <% end %>
+    """
+  end
+
   def bc_button(assigns) do
     values = %{
       :off => "BC1",

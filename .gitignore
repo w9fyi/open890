@@ -40,3 +40,8 @@ npm-debug.log
 *.dets
 
 config.toml
+# Local RNNoise helper build output
+/priv/bin/open890_rnnoise_filter
+
+# Local TLS proxy artifacts
+/tls/

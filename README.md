@@ -208,3 +208,38 @@ This project is licensed under the MIT license. Please see [MIT-LICENSE](MIT-LIC
 
 All product names, logos, brands, trademarks and registered trademarks are property of their respective owners. All company, product and service names used in this software are for identification purposes only.
 
+
+## Optional: RNNoise RX Denoising (Raspberry Pi)
+
+open890 can denoise incoming RX audio on the server side using RNNoise before broadcasting audio to the browser.
+
+### 1) Build RNNoise locally
+
+```bash
+cd ~/open890
+./scripts/build_rnnoise_local.sh
+```
+
+By default this installs RNNoise to `~/.local/open890-rnnoise`.
+
+### 2) Build the open890 RNNoise helper
+
+```bash
+cd ~/open890
+./scripts/build_open890_rnnoise_filter.sh
+```
+
+This creates `priv/bin/open890_rnnoise_filter`.
+
+### 3) Enable RNNoise in open890
+
+Set these environment variables before starting open890:
+
+```bash
+export OPEN890_RNNOISE_ENABLED=true
+export OPEN890_RNNOISE_BIN="$HOME/open890/priv/bin/open890_rnnoise_filter"
+# Optional (default 30)
+export OPEN890_RNNOISE_TIMEOUT_MS=30
+```
+
+If RNNoise is disabled or unavailable, open890 automatically falls back to passthrough audio.
