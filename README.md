@@ -318,8 +318,10 @@ export OPEN890_FT8_WINDOW_SECONDS=15
 
 ### 3) Start open890 and open the FT8 tab
 
-- Toggle **FT8 Decoder: ON**.
+- Choose an FT8 band preset from the FT8 tab picker (for example 40m 7.074, 20m 14.074, 17m 18.100).
+- Click **Start FT8** to tune to that preset and enable decoding.
 - Watch decode output in the list.
+- Use **Stop FT8** to stop the FT8 decoder.
 - Click a decode entry to retune the active VFO to that FT8 audio offset (relative to 1500 Hz).
 
 ### GPL note for real WSJT-X integration

@@ -769,20 +769,42 @@
           >
             <div class="ui one column grid row">
               <div class="column">
+                <form class="ui form" phx-change="set_ft8_band">
+                  <label for="ft8-band-select" class="secondaryText">FT8 Band</label>
+                  <select
+                    id="ft8-band-select"
+                    name="band"
+                    class="ui mini fluid dropdown"
+                    aria-label="Select FT8 band preset"
+                  >
+                    <%= for preset <- @ft8_band_presets do %>
+                      <option value={preset.id} selected={preset.id == @ft8_band_preset}>
+                        <%= preset.label %>
+                      </option>
+                    <% end %>
+                  </select>
+                </form>
+              </div>
+
+              <div class="column">
+                <button type="button" class="ui small green fluid button" phx-click="start_ft8">
+                  Start FT8
+                </button>
+              </div>
+
+              <div class="column">
                 <button
                   type="button"
                   class={
                     if @ft8_enabled,
-                      do: "ui small green fluid button",
-                      else: "ui small black fluid button"
+                      do: "ui small black fluid button",
+                      else: "ui small black fluid button disabled"
                   }
-                  phx-click="toggle_ft8_decoder"
+                  phx-click="stop_ft8"
+                  disabled={!@ft8_enabled}
+                  aria-disabled={!@ft8_enabled}
                 >
-                  <%= if @ft8_enabled do %>
-                    FT8 Decoder: ON
-                  <% else %>
-                    FT8 Decoder: OFF
-                  <% end %>
+                  Stop FT8
                 </button>
               </div>
 
@@ -818,9 +840,13 @@
                   <div class="secondaryText">
                     <strong>Last Tune:</strong>
                     <span>
-                      <%= format_raw_frequency(@ft8_last_tuned.target_hz) %> ( <%= if @ft8_last_tuned.delta_hz >=
-                                                                                        0,
-                                                                                      do: "+" %><%= @ft8_last_tuned.delta_hz %> Hz)
+                      <%= format_raw_frequency(@ft8_last_tuned.target_hz) %>
+                      <%= if is_number(@ft8_last_tuned.delta_hz) do %>
+                        (<%= if @ft8_last_tuned.delta_hz >= 0, do: "+" %><%= @ft8_last_tuned.delta_hz %> Hz)
+                      <% end %>
+                      <%= if Map.get(@ft8_last_tuned, :preset_label) do %>
+                        from <%= @ft8_last_tuned.preset_label %>
+                      <% end %>
                     </span>
                   </div>
                 </div>

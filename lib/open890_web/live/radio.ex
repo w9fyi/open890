@@ -39,6 +39,19 @@ defmodule Open890Web.Live.Radio do
   import Open890Web.Components.Buttons
 
   @ft8_reference_tone_hz 1500.0
+  @ft8_band_presets [
+    %{id: "160m", label: "160m - 1.840", freq_hz: 1_840_000},
+    %{id: "80m", label: "80m - 3.573", freq_hz: 3_573_000},
+    %{id: "60m", label: "60m - 5.357", freq_hz: 5_357_000},
+    %{id: "40m", label: "40m - 7.074", freq_hz: 7_074_000},
+    %{id: "30m", label: "30m - 10.136", freq_hz: 10_136_000},
+    %{id: "20m", label: "20m - 14.074", freq_hz: 14_074_000},
+    %{id: "17m", label: "17m - 18.100", freq_hz: 18_100_000},
+    %{id: "15m", label: "15m - 21.074", freq_hz: 21_074_000},
+    %{id: "12m", label: "12m - 24.915", freq_hz: 24_915_000},
+    %{id: "10m", label: "10m - 28.074", freq_hz: 28_074_000},
+    %{id: "6m", label: "6m - 50.313", freq_hz: 50_313_000}
+  ]
 
   @impl true
   def mount(%{"id" => connection_id} = params, _session, socket) do
@@ -55,6 +68,8 @@ defmodule Open890Web.Live.Radio do
       |> assign(:software_nr_enabled, RNNoisePort.enabled?())
       |> assign(:ft8_status, FT8DecoderPort.status())
       |> assign(:ft8_enabled, FT8DecoderPort.enabled?())
+      |> assign(:ft8_band_presets, @ft8_band_presets)
+      |> assign(:ft8_band_preset, default_ft8_band_id())
 
     socket =
       with {:ok, file} <- File.read("config/config.toml"),
@@ -299,6 +314,59 @@ defmodule Open890Web.Live.Radio do
     {:noreply, socket}
   end
 
+  def handle_event("set_ft8_band", %{"band" => band_id}, socket) do
+    case ft8_preset_by_id(band_id) do
+      nil ->
+        {:noreply, socket |> put_ft8_error("Unknown FT8 band preset")}
+
+      _preset ->
+        {:noreply,
+         socket
+         |> assign(:ft8_band_preset, band_id)
+         |> clear_ft8_error()}
+    end
+  end
+
+  def handle_event("start_ft8", _params, socket) do
+    with %{freq_hz: target_hz, label: preset_label} <-
+           ft8_preset_by_id(socket.assigns.ft8_band_preset),
+         {:ok, tune_info} <- tune_active_vfo(socket, target_hz) do
+      updated_enabled = FT8DecoderPort.set_enabled(true)
+
+      socket =
+        socket
+        |> clear_ft8_error()
+        |> assign(:ft8_enabled, updated_enabled)
+        |> assign(:ft8_status, FT8DecoderPort.status())
+        |> assign(
+          :ft8_last_tuned,
+          Map.merge(tune_info, %{preset_label: preset_label, delta_hz: nil})
+        )
+
+      {:noreply, socket}
+    else
+      nil ->
+        {:noreply, socket |> put_ft8_error("Unknown FT8 band preset")}
+
+      {:error, :no_active_receiver} ->
+        {:noreply, socket |> put_ft8_error("No active receiver selected for FT8 tune")}
+
+      _ ->
+        {:noreply, socket |> put_ft8_error("Unable to start FT8")}
+    end
+  end
+
+  def handle_event("stop_ft8", _params, socket) do
+    updated_enabled = FT8DecoderPort.set_enabled(false)
+
+    socket =
+      socket
+      |> assign(:ft8_enabled, updated_enabled)
+      |> assign(:ft8_status, FT8DecoderPort.status())
+
+    {:noreply, socket}
+  end
+
   def handle_event("clear_ft8_decodes", _params, socket) do
     {:noreply, assign(socket, :ft8_decodes, [])}
   end
@@ -315,6 +383,9 @@ defmodule Open890Web.Live.Radio do
     else
       {:error, :no_active_frequency} ->
         {:noreply, socket |> put_ft8_error("No active frequency available to tune")}
+
+      {:error, :no_active_receiver} ->
+        {:noreply, socket |> put_ft8_error("No active receiver selected for FT8 tune")}
 
       _ ->
         {:noreply, socket |> put_ft8_error("Invalid FT8 decode frequency")}
@@ -630,25 +701,48 @@ defmodule Open890Web.Live.Radio do
 
   defp tune_to_ft8_decode(socket, decode_freq_hz) do
     radio_state = socket.assigns.radio_state
-    connection = socket.assigns.radio_connection
 
     active_frequency_hz = RadioState.effective_active_frequency(radio_state)
 
     if is_integer(active_frequency_hz) and active_frequency_hz > 0 do
       delta_hz = round(decode_freq_hz - @ft8_reference_tone_hz)
       target_hz = max(active_frequency_hz + delta_hz, 0)
-      target = target_hz |> Integer.to_string() |> String.pad_leading(11, "0")
 
-      case radio_state.active_receiver do
-        :a -> connection |> ConnectionCommands.cmd("FA#{target}")
-        :b -> connection |> ConnectionCommands.cmd("FB#{target}")
-        _ -> :ok
+      with {:ok, tune_info} <- tune_active_vfo(socket, target_hz) do
+        {:ok, Map.merge(tune_info, %{decode_freq_hz: round(decode_freq_hz), delta_hz: delta_hz})}
       end
-
-      {:ok, %{decode_freq_hz: round(decode_freq_hz), delta_hz: delta_hz, target_hz: target_hz}}
     else
       {:error, :no_active_frequency}
     end
+  end
+
+  defp tune_active_vfo(socket, target_hz) when is_integer(target_hz) and target_hz >= 0 do
+    radio_state = socket.assigns.radio_state
+    connection = socket.assigns.radio_connection
+    target = target_hz |> Integer.to_string() |> String.pad_leading(11, "0")
+
+    case radio_state.active_receiver do
+      :a ->
+        connection |> ConnectionCommands.cmd("FA#{target}")
+        {:ok, %{target_hz: target_hz}}
+
+      :b ->
+        connection |> ConnectionCommands.cmd("FB#{target}")
+        {:ok, %{target_hz: target_hz}}
+
+      _ ->
+        {:error, :no_active_receiver}
+    end
+  end
+
+  defp ft8_preset_by_id(id) when is_binary(id) do
+    Enum.find(@ft8_band_presets, fn preset -> preset.id == id end)
+  end
+
+  defp default_ft8_band_id do
+    @ft8_band_presets
+    |> Enum.find(%{id: "20m"}, fn preset -> preset.id == "20m" end)
+    |> Map.fetch!(:id)
   end
 
   defp put_ft8_error(socket, message) do

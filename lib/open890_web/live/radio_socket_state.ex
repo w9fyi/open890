@@ -22,6 +22,8 @@ defmodule Open890Web.Live.RadioSocketState do
     {:ft8_status, %{}},
     {:ft8_decodes, []},
     {:ft8_last_tuned, nil},
+    {:ft8_band_preset, "20m"},
+    {:ft8_band_presets, []},
     {:spectrum_scale, 1.0},
     {:theme, "kenwood"},
     {:voip_mic_enabled, false},
