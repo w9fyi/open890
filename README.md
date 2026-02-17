@@ -13,6 +13,37 @@ currently untested.
 
 ![open890 screenshot](docs/screenshot.png)
 
+## 1-Minute Quick Start
+
+1. Install open890 using either:
+   - Docker (fastest), or
+   - Raspberry Pi install (best for dedicated shack use)
+2. Start open890 and open the web UI in your browser.
+3. Connect to your radio and verify RX audio.
+4. Enable VOIP microphone:
+   - Browser should prompt for mic access
+   - Select your preferred mic/speaker devices (if browser supports it)
+5. Use keyboard shortcuts:
+   - `Ctrl+Shift+L` LSB
+   - `Ctrl+Shift+U` USB
+   - `Ctrl+Shift+C` CW
+   - `Ctrl+Shift+A` AM
+   - `Ctrl+Shift+F` FM
+   - `Cmd+Shift+E` Frequency entry
+   - Hold `Option+Shift` for PTT (TX while held)
+
+### Important
+
+Microphone access requires `https://` (or `localhost`).
+If you use plain `http://` on LAN, mic permissions may show as unavailable.
+
+### Troubleshooting Tips
+
+- If microphone permissions say unavailable: use `https://` and re-check browser/OS mic permissions.
+- iOS Safari may not expose per-site audio output selection; route audio at system level (Control Center/AirPlay).
+- If the wrong mic is used, reselect the input device and toggle VOIP mic off/on.
+
+
 ## Getting Help
 
 I am primarily active on the [TS-890S groups.io discussion board](https://groups.io/g/TS-890)
