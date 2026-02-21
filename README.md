@@ -44,6 +44,10 @@ If you use plain `http://` on LAN, mic permissions may show as unavailable.
 - If the wrong mic is used, reselect the input device and toggle VOIP mic off/on.
 
 
+## User Manual
+
+See [open890 User Manual](docs/open890_user_manual.md) for detailed daily operation, browser audio setup, and troubleshooting.
+
 ## Getting Help
 
 I am primarily active on the [TS-890S groups.io discussion board](https://groups.io/g/TS-890)
