@@ -197,13 +197,25 @@ let Hooks = {
         return {ok: false, reason: "player_unavailable"}
       }
 
-      if (typeof this.player.audioCtx.setSinkId !== "function") {
-        return {ok: false, reason: "unsupported"}
-      }
+      const targetDeviceId = deviceId || "default"
 
       try {
-        await this.player.audioCtx.setSinkId(deviceId || "default")
-        return {ok: true}
+        if (typeof this.player.audioCtx.setSinkId === "function") {
+          await this.player.audioCtx.setSinkId(targetDeviceId)
+          return {ok: true}
+        }
+
+        if (this.outputElement && typeof this.outputElement.setSinkId === "function") {
+          await this.outputElement.setSinkId(targetDeviceId)
+
+          if (this.outputElement.paused) {
+            await this.outputElement.play()
+          }
+
+          return {ok: true}
+        }
+
+        return {ok: false, reason: "unsupported"}
       } catch (error) {
         console.error("Unable to set audio output device", error)
 
@@ -225,14 +237,85 @@ let Hooks = {
         flushingTime: 125
       })
 
+      this.outputElement = null
+
+      const mediaElementSupportsSink = !!(
+        typeof HTMLMediaElement !== "undefined" &&
+        HTMLMediaElement.prototype &&
+        typeof HTMLMediaElement.prototype.setSinkId === "function"
+      )
+
+      if (mediaElementSupportsSink && typeof this.player.audioCtx.setSinkId !== "function") {
+        try {
+          const streamDestination = this.player.audioCtx.createMediaStreamDestination()
+          this.player.gainNode.disconnect()
+          this.player.gainNode.connect(streamDestination)
+
+          this.outputElement = document.createElement("audio")
+          this.outputElement.autoplay = true
+          this.outputElement.playsInline = true
+          this.outputElement.srcObject = streamDestination.stream
+          this.outputElement.style.display = "none"
+          this.el.appendChild(this.outputElement)
+        } catch (error) {
+          console.error("Unable to initialize audio output element", error)
+          this.outputElement = null
+        }
+      }
+
+      this.resumeAudioContext = async () => {
+        if (!this.player || !this.player.audioCtx) {
+          return
+        }
+
+        if (this.player.audioCtx.state === "suspended") {
+          try {
+            await this.player.audioCtx.resume()
+          } catch (error) {
+            console.debug("Audio context resume deferred", error)
+          }
+        }
+
+        if (this.outputElement && this.outputElement.paused) {
+          try {
+            await this.outputElement.play()
+          } catch (error) {
+            console.debug("Audio output element play deferred", error)
+          }
+        }
+      }
+
+      this.onUnlockAudio = () => {
+        this.resumeAudioContext()
+      }
+
+      this.bindAudioUnlockHandlers = () => {
+        document.addEventListener("click", this.onUnlockAudio, {passive: true})
+        document.addEventListener("touchstart", this.onUnlockAudio, {passive: true})
+        document.addEventListener("keydown", this.onUnlockAudio)
+      }
+
+      this.unbindAudioUnlockHandlers = () => {
+        document.removeEventListener("click", this.onUnlockAudio)
+        document.removeEventListener("touchstart", this.onUnlockAudio)
+        document.removeEventListener("keydown", this.onUnlockAudio)
+      }
+
+      this.bindAudioUnlockHandlers()
+
       this.audioStreamChannel = socket.channel("radio:audio_stream", {})
       this.audioStreamChannel.join()
-        .receive("ok", (resp) => { console.log("joined audio stream channel, resp:", resp) })
+        .receive("ok", async (resp) => {
+          console.log("joined audio stream channel, resp:", resp)
+          await this.resumeAudioContext()
+        })
         .receive("error", (resp) => {
            console.log("unable to join audio stream channel:", resp)
         })
 
       this.audioStreamChannel.on("audio_data", (data) => {
+        this.resumeAudioContext()
+
         if (this.player) {
           this.player.feed(new Uint8Array(data.payload))
         }
@@ -261,8 +344,18 @@ let Hooks = {
         this.audioStreamChannel.leave()
       }
 
+      if (this.outputElement) {
+        this.outputElement.pause()
+        this.outputElement.srcObject = null
+        this.outputElement.remove()
+      }
+
       if (this.player) {
         this.player.destroy()
+      }
+
+      if (this.unbindAudioUnlockHandlers) {
+        this.unbindAudioUnlockHandlers()
       }
 
       if (this.onSetAudioOutput) {
@@ -279,11 +372,18 @@ let Hooks = {
       this.defaultOptionLabel = "System Default"
 
       const AudioContextCtor = window.AudioContext || window.webkitAudioContext
-      this.isSinkSelectionSupported = !!(
+      const audioContextSinkSupported = !!(
         AudioContextCtor &&
         AudioContextCtor.prototype &&
         typeof AudioContextCtor.prototype.setSinkId === "function"
       )
+      const mediaElementSinkSupported = !!(
+        typeof HTMLMediaElement !== "undefined" &&
+        HTMLMediaElement.prototype &&
+        typeof HTMLMediaElement.prototype.setSinkId === "function"
+      )
+
+      this.isSinkSelectionSupported = audioContextSinkSupported || mediaElementSinkSupported
 
       this.onOutputResult = (event) => {
         const details = event && event.detail ? event.detail : null
@@ -302,7 +402,10 @@ let Hooks = {
         }
 
         if (details.reason === "unsupported") {
-          this.renderStatus("Use your system audio output selector")
+          const isSafari = /^((?\!chrome|android).)*safari/i.test(navigator.userAgent)
+          this.renderStatus(isSafari
+            ? "Safari doesn't support audio output selection. Use Chrome or Firefox for per-device routing."
+            : "Your browser doesn't support audio output selection.")
           return
         }
 
@@ -376,6 +479,13 @@ let Hooks = {
 
       const savedDeviceId = window.localStorage.getItem(this.storageKey) || "default"
 
+      if (!window.isSecureContext) {
+        this.setOptions([{deviceId: "default", label: this.defaultOptionLabel}], savedDeviceId)
+        this.select.disabled = true
+        this.renderStatus("Use HTTPS to select browser audio outputs")
+        return
+      }
+
       if (!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== "function") {
         this.setOptions([{deviceId: "default", label: this.defaultOptionLabel}], savedDeviceId)
         this.select.disabled = true
@@ -403,7 +513,10 @@ let Hooks = {
         this.select.disabled = !this.isSinkSelectionSupported
 
         if (!this.isSinkSelectionSupported) {
-          this.renderStatus("Use your system audio output selector")
+          const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+          this.renderStatus(isSafari
+            ? "Safari doesn't support output selection — use Chrome or Firefox. Mac: route audio in System Settings → Sound."
+            : "Your browser doesn't support audio output selection.")
           return
         }
 
@@ -590,6 +703,13 @@ let Hooks = {
       }
 
       const savedDeviceId = preferredDeviceId || window.localStorage.getItem(this.storageKey) || "default"
+
+      if (!window.isSecureContext) {
+        this.setOptions([{deviceId: "default", label: this.defaultOptionLabel}], savedDeviceId)
+        this.select.disabled = true
+        this.renderStatus("Use HTTPS to select microphone devices")
+        return
+      }
 
       if (!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== "function") {
         this.setOptions([{deviceId: "default", label: this.defaultOptionLabel}], savedDeviceId)
