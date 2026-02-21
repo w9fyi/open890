@@ -21,6 +21,34 @@ Before you start:
 3. You know the open890 URL (for example `https://your-host:4000`).
 4. For microphone and per-device audio selection, use a modern browser over `https://`.
 
+### Windows install (Docker Desktop, recommended for this fork)
+
+Use this path for Windows users who want the same behavior from this repository branch (including current audio and accessibility updates).
+
+1. Install Docker Desktop for Windows and make sure WSL2 backend is enabled.
+2. Install Git for Windows.
+3. Open PowerShell.
+4. Clone and start from your fork `main` branch:
+
+```powershell
+git clone https://github.com/w9fyi/open890.git
+cd open890
+git switch main
+docker compose up --build -d
+```
+
+5. Open `http://localhost:4000` in Chrome or Edge.
+6. To stop later:
+
+```powershell
+docker compose down
+```
+
+Notes:
+
+- If a browser blocks microphone access, confirm site permission is allowed and retry on `https://` when running remote access.
+- Native Windows `.bat` release packages are valid for upstream releases, but they may not include fork-specific changes unless you build/publish your own Windows artifact.
+
 ## 3. Open the UI
 
 1. Open Chrome, Edge, or Safari.
