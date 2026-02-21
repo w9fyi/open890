@@ -1346,19 +1346,20 @@ let Hooks = {
   },
   AudioScope: {
     mounted() {
+      const pushFilterAdjust = (isUp, isShifted = false) => {
+        this.pushEvent("adjust_filter", {
+          dir: isUp ? "up" : "down",
+          shift: !!isShifted
+        })
+      }
+
       this.el.addEventListener("wheel", (event) => {
-        event.preventDefault();
-        const isScrollUp = event.deltaY < 0;
-
-        const dir = isScrollUp ? "up" : "down";
-        const isShifted = event.shiftKey;
-
-        console.log("audioScope wheel, dir:", dir, "shifted", isShifted, "event:", event);
-        this.pushEvent("adjust_filter", {dir: dir, shift: isShifted})
-      });
+        event.preventDefault()
+        pushFilterAdjust(event.deltaY < 0, event.shiftKey)
+      })
 
       this.el.addEventListener("click", (event) => {
-        event.preventDefault();
+        event.preventDefault()
         this.pushEvent("cw_tune", {})
       })
 
@@ -1366,13 +1367,15 @@ let Hooks = {
         switch (event.key) {
           case "ArrowUp":
           case "ArrowRight":
+          case "PageUp":
             event.preventDefault()
-            this.pushEvent("adjust_filter", {dir: "up", shift: event.shiftKey})
+            pushFilterAdjust(true, event.shiftKey)
             break
           case "ArrowDown":
           case "ArrowLeft":
+          case "PageDown":
             event.preventDefault()
-            this.pushEvent("adjust_filter", {dir: "down", shift: event.shiftKey})
+            pushFilterAdjust(false, event.shiftKey)
             break
           case "Enter":
           case " ":
@@ -1415,8 +1418,38 @@ let Hooks = {
       this.clearScope()
 
       this.el.addEventListener("click", (event) => {
-        event.preventDefault();
+        event.preventDefault()
         this.pushEvent("cw_tune", {})
+      })
+
+      this.el.addEventListener("wheel", (event) => {
+        event.preventDefault()
+        this.pushEvent("adjust_filter", {
+          dir: event.deltaY < 0 ? "up" : "down",
+          shift: !!event.shiftKey
+        })
+      })
+
+      this.el.addEventListener("keydown", (event) => {
+        switch (event.key) {
+          case "ArrowUp":
+          case "ArrowRight":
+          case "PageUp":
+            event.preventDefault()
+            this.pushEvent("adjust_filter", {dir: "up", shift: !!event.shiftKey})
+            break
+          case "ArrowDown":
+          case "ArrowLeft":
+          case "PageDown":
+            event.preventDefault()
+            this.pushEvent("adjust_filter", {dir: "down", shift: !!event.shiftKey})
+            break
+          case "Enter":
+          case " ":
+            event.preventDefault()
+            this.pushEvent("cw_tune", {})
+            break
+        }
       })
 
       this.handleEvent("scope_data", (event) => {

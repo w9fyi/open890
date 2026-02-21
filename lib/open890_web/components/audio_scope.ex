@@ -8,7 +8,20 @@ defmodule Open890Web.Components.AudioScope do
   def audio_scope(assigns) do
     ~H"""
       <div class="audioScopeWrapper">
-        <svg id="audioScope" class="scope themed" viewbox="0 0 212 60" phx-hook="AudioScope" pointer-events="visible-painted" tabindex="0" role="application" aria-label="Audio scope. Use arrow up and down to adjust filter. Press enter to trigger CW tune.">
+        <p id="audioScopeInstructions" class="sr-only">
+          Use arrow keys to adjust filter width or low cut. Hold Shift while pressing arrow keys to adjust filter shift or high cut. Press Enter or Space to trigger CW tune.
+        </p>
+        <svg
+          id="audioScope"
+          class="scope themed"
+          viewbox="0 0 212 60"
+          phx-hook="AudioScope"
+          pointer-events="visible-painted"
+          tabindex="0"
+          role="application"
+          aria-describedby="audioScopeInstructions"
+          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight Enter Space"
+          aria-label="Audio scope filter control and CW tune trigger">
           <defs>
             <lineargradient id="kenwoodAudioScope" x1="0" y1="60" x2="0" y2="0" gradientunits="userSpaceOnUse">
               <stop offset="15%" stop-color="#030356" />
@@ -58,7 +71,18 @@ defmodule Open890Web.Components.AudioScope do
 
         </svg>
 
-        <canvas phx-hook="AudioScopeCanvas" id="AudioScopeCanvas" data-theme={@theme} class="waterfall hover-pointer" width="213" height="60" tabindex="0" role="application" aria-label="Audio waterfall scope. Use arrow up and down to adjust filter."></canvas>
+        <canvas
+          phx-hook="AudioScopeCanvas"
+          id="AudioScopeCanvas"
+          data-theme={@theme}
+          class="waterfall hover-pointer"
+          width="213"
+          height="60"
+          tabindex="0"
+          role="application"
+          aria-describedby="audioScopeInstructions"
+          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight Enter Space"
+          aria-label="Audio waterfall filter control and CW tune trigger"></canvas>
       </div>
     """
   end

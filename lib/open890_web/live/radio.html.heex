@@ -464,7 +464,7 @@
           </AudioScope.audio_scope>
 
           <div class="scopeButtonsContainer">
-            <%= if false && RadioState.effective_active_mode(@radio_state) in [:usb, :lsb, :usb_d, :lsb_d] do %>
+            <%= if RadioState.effective_active_mode(@radio_state) in [:usb, :lsb, :usb_d, :lsb_d] do %>
               <.ssb_shift_width_button
                 active_mode={RadioState.effective_active_mode(@radio_state)}
                 ssb_filter_mode={@radio_state.ssb_filter_mode}
@@ -473,6 +473,52 @@
             <% end %>
 
             <.filter_buttons active_if_filter={@radio_state.active_if_filter} />
+
+            <div class="ui mini black buttons" role="group" aria-label="Filter width or low cut adjustment">
+              <button
+                type="button"
+                class="ui mini black button"
+                phx-click="adjust_filter"
+                phx-value-dir="down"
+                aria-label="Decrease filter width or low cut"
+              >
+                Filter -
+              </button>
+              <button
+                type="button"
+                class="ui mini black button"
+                phx-click="adjust_filter"
+                phx-value-dir="up"
+                aria-label="Increase filter width or low cut"
+              >
+                Filter +
+              </button>
+            </div>
+
+            <%= if RadioState.effective_active_mode(@radio_state) not in [:fsk, :fsk_r, :psk, :psk_r] do %>
+              <div class="ui mini black buttons" role="group" aria-label="Filter shift or high cut adjustment">
+                <button
+                  type="button"
+                  class="ui mini black button"
+                  phx-click="adjust_filter"
+                  phx-value-dir="down"
+                  phx-value-shift="1"
+                  aria-label="Decrease filter shift or high cut"
+                >
+                  Shift/HC -
+                </button>
+                <button
+                  type="button"
+                  class="ui mini black button"
+                  phx-click="adjust_filter"
+                  phx-value-dir="up"
+                  phx-value-shift="1"
+                  aria-label="Increase filter shift or high cut"
+                >
+                  Shift/HC +
+                </button>
+              </div>
+            <% end %>
 
             <%= if RadioState.effective_active_mode(@radio_state) in [:cw, :cw_r, :fsk, :fsk_r] do %>
               <%= if RadioState.effective_active_mode(@radio_state) in [:cw, :cw_r] do %>
