@@ -402,7 +402,7 @@ let Hooks = {
         }
 
         if (details.reason === "unsupported") {
-          const isSafari = /^((?\!chrome|android).)*safari/i.test(navigator.userAgent)
+          const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
           this.renderStatus(isSafari
             ? "Safari doesn't support audio output selection. Use Chrome or Firefox for per-device routing."
             : "Your browser doesn't support audio output selection.")
