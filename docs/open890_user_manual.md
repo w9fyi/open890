@@ -49,6 +49,24 @@ Notes:
 - If a browser blocks microphone access, confirm site permission is allowed and retry on `https://` when running remote access.
 - Native Windows `.bat` release packages are valid for upstream releases, but they may not include fork-specific changes unless you build/publish your own Windows artifact.
 
+### Windows troubleshooting (Docker + browser media)
+
+If audio device selection does not behave as expected on Windows, check these first:
+
+1. Confirm services are up:
+
+```powershell
+docker compose ps
+```
+
+`open890` should be running and port `4000` should not be in use by another app.
+
+2. In Chrome/Edge site settings for open890, set **Microphone** to **Allow**, then reload the page.
+3. For output switching, open the open890 output dropdown and use **Select output device...** (permission prompt may appear only after a click gesture).
+4. In Windows **Settings -> System -> Sound -> Volume mixer**, confirm Chrome/Edge is not pinned to a different output than the one you selected in open890.
+5. If input keeps reverting, close apps that may hold the mic (Teams/Zoom/Discord), then re-select your mic in open890.
+6. For remote hosts, use `https://`; device access is limited on insecure origins.
+
 ## 3. Open the UI
 
 1. Open Chrome, Edge, or Safari.
