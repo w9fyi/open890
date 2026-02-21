@@ -598,6 +598,11 @@ let Hooks = {
       this.status = this.el.querySelector(".audio-input-status")
       this.storageKey = "open890.mic_input_device"
       this.defaultOptionLabel = "System Default"
+      this.pickInputOptionValue = "__pick_input_device__"
+      this.pickInputOptionLabel = "Enable microphone list..."
+      this.canPromptForMicInput =
+        navigator.mediaDevices &&
+        typeof navigator.mediaDevices.getUserMedia === "function"
       this.hasRequestedMicPermission = false
 
       this.onInputResult = (event) => {
@@ -620,7 +625,7 @@ let Hooks = {
       }
 
       this.onDeviceChange = () => {
-        this.populateInputDevices()
+        this.populateInputDevices(window.localStorage.getItem(this.storageKey) || "default")
       }
 
       if (navigator.mediaDevices && typeof navigator.mediaDevices.addEventListener === "function") {
@@ -649,10 +654,24 @@ let Hooks = {
       if (this.select) {
         this.select.addEventListener("focus", this.onSelectFocus)
         this.select.addEventListener("change", async () => {
-          const deviceId = this.select.value || "default"
-          window.localStorage.setItem(this.storageKey, deviceId)
+          const requestedDeviceId = this.select.value || "default"
+          const previousDeviceId = window.localStorage.getItem(this.storageKey) || "default"
 
-          if (deviceId !== "default") {
+          if (requestedDeviceId === this.pickInputOptionValue) {
+            this.hasRequestedMicPermission = true
+            this.renderStatus("Waiting for microphone permission...")
+            const permission = await this.requestMicrophonePermission()
+
+            if (!permission.ok) {
+              this.hasRequestedMicPermission = false
+              this.renderStatus(permission.message)
+            }
+
+            await this.populateInputDevices(previousDeviceId)
+            return
+          }
+
+          if (requestedDeviceId !== "default") {
             this.hasRequestedMicPermission = true
             const permission = await this.requestMicrophonePermission()
 
@@ -660,19 +679,23 @@ let Hooks = {
               this.hasRequestedMicPermission = false
               window.dispatchEvent(new CustomEvent("open890:mic-input-result", {
                 detail: {
-                  deviceId,
+                  deviceId: requestedDeviceId,
                   ok: false,
                   message: permission.message
                 }
               }))
+              await this.populateInputDevices(previousDeviceId)
               return
             }
 
-            await this.populateInputDevices(deviceId)
+            this.renderStatus("Switching microphone...")
+            window.localStorage.setItem(this.storageKey, requestedDeviceId)
+            await this.populateInputDevices(requestedDeviceId)
             return
           }
 
-          this.dispatchSelection(deviceId)
+          window.localStorage.setItem(this.storageKey, "default")
+          this.dispatchSelection("default")
         })
       }
 
@@ -776,10 +799,23 @@ let Hooks = {
 
       try {
         const devices = await navigator.mediaDevices.enumerateDevices()
-        const inputDevices = devices.filter((device) => device.kind === "audioinput")
+        const inputDevices = devices.filter((device) =>
+          device.kind === "audioinput" && device.deviceId !== "default"
+        )
+        const hasNamedInputs = inputDevices.some(
+          (device) => device.label && device.label.trim() !== ""
+        )
 
-        const options = [
-          {deviceId: "default", label: this.defaultOptionLabel},
+        const options = [{deviceId: "default", label: this.defaultOptionLabel}]
+
+        if (this.canPromptForMicInput && inputDevices.length > 0 && !hasNamedInputs) {
+          options.push({
+            deviceId: this.pickInputOptionValue,
+            label: this.pickInputOptionLabel
+          })
+        }
+
+        options.push(
           ...inputDevices.map((device, index) => {
             const label = device.label && device.label.trim() !== ""
               ? device.label
@@ -787,14 +823,23 @@ let Hooks = {
 
             return {deviceId: device.deviceId, label}
           })
-        ]
+        )
 
         this.setOptions(options, savedDeviceId)
-        this.select.disabled = false
+        this.select.disabled = options.length === 1 && !this.canPromptForMicInput
 
         const selectedDeviceId = this.select.value || "default"
+        if (selectedDeviceId === this.pickInputOptionValue) {
+          this.renderStatus("Select \"Enable microphone list...\" to choose a microphone")
+          return
+        }
+
         window.localStorage.setItem(this.storageKey, selectedDeviceId)
         this.dispatchSelection(selectedDeviceId)
+
+        if (!hasNamedInputs && this.canPromptForMicInput && inputDevices.length > 0) {
+          this.renderStatus("Select \"Enable microphone list...\" to choose a microphone")
+        }
       } catch (error) {
         console.error("Unable to enumerate microphone devices", error)
         this.setOptions([{deviceId: "default", label: this.defaultOptionLabel}], savedDeviceId)
