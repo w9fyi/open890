@@ -445,40 +445,74 @@ let Hooks = {
 
       window.addEventListener("open890:audio-output-result", this.onOutputResult)
 
-      if (this.select) {
-        this.select.addEventListener("change", async () => {
-          const previousDeviceId = window.localStorage.getItem(this.storageKey) || "default"
-          let deviceId = this.select.value || "default"
-          const selectedLabel = this.select.options[this.select.selectedIndex]
-            ? this.select.options[this.select.selectedIndex].text
-            : this.defaultOptionLabel
+      this.onSelectChange = async () => {
+        if (!this.select) {
+          return
+        }
 
-          if (deviceId === this.pickOutputOptionValue) {
-            const selected = await this.promptForOutputSelection()
-            await this.populateOutputDevices(selected ? selected.deviceId : previousDeviceId)
+        const previousDeviceId = window.localStorage.getItem(this.storageKey) || "default"
+        let deviceId = this.select.value || "default"
+        const selectedLabel = this.select.options[this.select.selectedIndex]
+          ? this.select.options[this.select.selectedIndex].text
+          : this.defaultOptionLabel
+
+        if (deviceId === this.pickOutputOptionValue) {
+          const selected = await this.promptForOutputSelection()
+          await this.populateOutputDevices(selected ? selected.deviceId : previousDeviceId)
+          return
+        }
+
+        if (deviceId !== "default" && this.canPromptForOutput) {
+          const selected = await this.promptForOutputSelection(deviceId)
+
+          if (!selected) {
+            await this.populateOutputDevices(previousDeviceId)
             return
           }
 
-          if (deviceId !== "default" && this.canPromptForOutput) {
-            const selected = await this.promptForOutputSelection(deviceId)
+          deviceId = selected.deviceId || deviceId
+          this.persistSelection(deviceId, selected.label || selectedLabel)
+          await this.populateOutputDevices(deviceId)
+          return
+        }
 
-            if (!selected) {
-              await this.populateOutputDevices(previousDeviceId)
-              return
-            }
-
-            deviceId = selected.deviceId || deviceId
-            this.persistSelection(deviceId, selected.label || selectedLabel)
-            await this.populateOutputDevices(deviceId)
-            return
-          }
-
-          this.persistSelection(deviceId, selectedLabel)
-          this.dispatchSelection(deviceId)
-        })
+        this.persistSelection(deviceId, selectedLabel)
+        this.dispatchSelection(deviceId)
       }
 
-      this.populateOutputDevices()
+      this.syncUiRefs = () => {
+        this.status = this.el.querySelector(".audio-output-status")
+
+        const nextSelect = this.el.querySelector("select")
+        const selectChanged = this.select !== nextSelect
+
+        if (selectChanged && this.select && this.onSelectChange) {
+          this.select.removeEventListener("change", this.onSelectChange)
+        }
+
+        this.select = nextSelect
+
+        if (selectChanged && this.select && this.onSelectChange) {
+          this.select.addEventListener("change", this.onSelectChange)
+        }
+
+        return selectChanged
+      }
+
+      this.syncUiRefs()
+      this.populateOutputDevices(window.localStorage.getItem(this.storageKey) || "default")
+    },
+
+    updated() {
+      if (!this.syncUiRefs) {
+        return
+      }
+
+      const selectChanged = this.syncUiRefs()
+
+      if (selectChanged) {
+        this.populateOutputDevices(window.localStorage.getItem(this.storageKey) || "default")
+      }
     },
 
     destroyed() {
@@ -488,6 +522,10 @@ let Hooks = {
 
       if (this.onOutputResult) {
         window.removeEventListener("open890:audio-output-result", this.onOutputResult)
+      }
+
+      if (this.select && this.onSelectChange) {
+        this.select.removeEventListener("change", this.onSelectChange)
       }
     },
 
@@ -730,58 +768,103 @@ let Hooks = {
         await this.populateInputDevices(window.localStorage.getItem(this.storageKey) || "default")
       }
 
-      if (this.select) {
-        this.select.addEventListener("focus", this.onSelectFocus)
-        this.select.addEventListener("change", async () => {
-          const requestedDeviceId = this.select.value || "default"
-          const previousDeviceId = window.localStorage.getItem(this.storageKey) || "default"
-          const selectedLabel = this.select.options[this.select.selectedIndex]
-            ? this.select.options[this.select.selectedIndex].text
-            : this.defaultOptionLabel
+      this.onSelectChange = async () => {
+        if (!this.select) {
+          return
+        }
 
-          if (requestedDeviceId === this.pickInputOptionValue) {
-            this.hasRequestedMicPermission = true
-            this.renderStatus("Waiting for microphone permission...")
-            const permission = await this.requestMicrophonePermission()
+        const requestedDeviceId = this.select.value || "default"
+        const previousDeviceId = window.localStorage.getItem(this.storageKey) || "default"
+        const selectedLabel = this.select.options[this.select.selectedIndex]
+          ? this.select.options[this.select.selectedIndex].text
+          : this.defaultOptionLabel
 
-            if (!permission.ok) {
-              this.hasRequestedMicPermission = false
-              this.renderStatus(permission.message)
-            }
+        if (requestedDeviceId === this.pickInputOptionValue) {
+          this.hasRequestedMicPermission = true
+          this.renderStatus("Waiting for microphone permission...")
+          const permission = await this.requestMicrophonePermission()
 
+          if (!permission.ok) {
+            this.hasRequestedMicPermission = false
+            this.renderStatus(permission.message)
+          }
+
+          await this.populateInputDevices(previousDeviceId)
+          return
+        }
+
+        if (requestedDeviceId !== "default") {
+          this.hasRequestedMicPermission = true
+          const permission = await this.requestMicrophonePermission()
+
+          if (!permission.ok) {
+            this.hasRequestedMicPermission = false
+            window.dispatchEvent(new CustomEvent("open890:mic-input-result", {
+              detail: {
+                deviceId: requestedDeviceId,
+                ok: false,
+                message: permission.message
+              }
+            }))
             await this.populateInputDevices(previousDeviceId)
             return
           }
 
-          if (requestedDeviceId !== "default") {
-            this.hasRequestedMicPermission = true
-            const permission = await this.requestMicrophonePermission()
+          this.renderStatus("Switching microphone...")
+          this.persistSelection(requestedDeviceId, selectedLabel)
+          await this.populateInputDevices(requestedDeviceId)
+          return
+        }
 
-            if (!permission.ok) {
-              this.hasRequestedMicPermission = false
-              window.dispatchEvent(new CustomEvent("open890:mic-input-result", {
-                detail: {
-                  deviceId: requestedDeviceId,
-                  ok: false,
-                  message: permission.message
-                }
-              }))
-              await this.populateInputDevices(previousDeviceId)
-              return
-            }
-
-            this.renderStatus("Switching microphone...")
-            this.persistSelection(requestedDeviceId, selectedLabel)
-            await this.populateInputDevices(requestedDeviceId)
-            return
-          }
-
-          this.persistSelection("default", this.defaultOptionLabel)
-          this.dispatchSelection("default")
-        })
+        this.persistSelection("default", this.defaultOptionLabel)
+        this.dispatchSelection("default")
       }
 
-      this.populateInputDevices()
+      this.syncUiRefs = () => {
+        this.status = this.el.querySelector(".audio-input-status")
+
+        const nextSelect = this.el.querySelector("select")
+        const selectChanged = this.select !== nextSelect
+
+        if (selectChanged && this.select) {
+          if (this.onSelectFocus) {
+            this.select.removeEventListener("focus", this.onSelectFocus)
+          }
+
+          if (this.onSelectChange) {
+            this.select.removeEventListener("change", this.onSelectChange)
+          }
+        }
+
+        this.select = nextSelect
+
+        if (selectChanged && this.select) {
+          if (this.onSelectFocus) {
+            this.select.addEventListener("focus", this.onSelectFocus)
+          }
+
+          if (this.onSelectChange) {
+            this.select.addEventListener("change", this.onSelectChange)
+          }
+        }
+
+        return selectChanged
+      }
+
+      this.syncUiRefs()
+      this.populateInputDevices(window.localStorage.getItem(this.storageKey) || "default")
+    },
+
+    updated() {
+      if (!this.syncUiRefs) {
+        return
+      }
+
+      const selectChanged = this.syncUiRefs()
+
+      if (selectChanged) {
+        this.populateInputDevices(window.localStorage.getItem(this.storageKey) || "default")
+      }
     },
 
     destroyed() {
@@ -795,6 +878,10 @@ let Hooks = {
 
       if (this.select && this.onSelectFocus) {
         this.select.removeEventListener("focus", this.onSelectFocus)
+      }
+
+      if (this.select && this.onSelectChange) {
+        this.select.removeEventListener("change", this.onSelectChange)
       }
     },
 
