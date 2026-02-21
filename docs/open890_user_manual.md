@@ -106,6 +106,11 @@ Notes:
 - Safari may not support per-site output switching the same way. If so, use system audio routing.
 - If labels are missing, grant permission first, then reopen the dropdown.
 
+### Known limitations (Chrome output by platform)
+
+- `macOS + Chrome`: per-site output selection can be limited; the dropdown may show a choice, but playback can still follow macOS system output. If that happens, switch output in macOS settings.
+- `Windows + Chrome/Edge`: per-site output selection usually works when site permission is granted, but Windows Volume Mixer or another app-level route can override the selected device.
+
 ## 7. Select microphone/input device (Chrome/Edge)
 
 1. Use `https://`.
