@@ -370,6 +370,11 @@ let Hooks = {
       this.status = this.el.querySelector(".audio-output-status")
       this.storageKey = "open890.audio_output_device"
       this.defaultOptionLabel = "System Default"
+      this.pickOutputOptionValue = "__pick_output_device__"
+      this.canPromptForOutput = !!(
+        navigator.mediaDevices &&
+        typeof navigator.mediaDevices.selectAudioOutput === "function"
+      )
 
       const AudioContextCtor = window.AudioContext || window.webkitAudioContext
       const audioContextSinkSupported = !!(
@@ -404,8 +409,8 @@ let Hooks = {
         if (details.reason === "unsupported") {
           const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
           this.renderStatus(isSafari
-            ? "Safari doesn't support audio output selection. Use Chrome or Firefox for per-device routing."
-            : "Your browser doesn't support audio output selection.")
+            ? "Safari does not support audio output selection. Use Chrome or Firefox for per-device routing."
+            : "Your browser does not support audio output selection.")
           return
         }
 
@@ -428,8 +433,15 @@ let Hooks = {
       window.addEventListener("open890:audio-output-result", this.onOutputResult)
 
       if (this.select) {
-        this.select.addEventListener("change", () => {
+        this.select.addEventListener("change", async () => {
           const deviceId = this.select.value || "default"
+
+          if (deviceId === this.pickOutputOptionValue) {
+            const selected = await this.promptForOutputSelection()
+            await this.populateOutputDevices(selected ? selected.deviceId : undefined)
+            return
+          }
+
           window.localStorage.setItem(this.storageKey, deviceId)
           this.dispatchSelection(deviceId)
         })
@@ -445,6 +457,35 @@ let Hooks = {
 
       if (this.onOutputResult) {
         window.removeEventListener("open890:audio-output-result", this.onOutputResult)
+      }
+    },
+
+    async promptForOutputSelection() {
+      if (!this.canPromptForOutput) {
+        return null
+      }
+
+      try {
+        return await navigator.mediaDevices.selectAudioOutput()
+      } catch (error) {
+        if (error && error.name === "NotAllowedError") {
+          this.renderStatus("Speaker selection permission was denied")
+          return null
+        }
+
+        if (error && error.name === "NotFoundError") {
+          this.renderStatus("No alternate audio output devices were found")
+          return null
+        }
+
+        if (error && error.name === "NotSupportedError") {
+          this.renderStatus("Browser does not support speaker selection prompt")
+          return null
+        }
+
+        console.error("Unable to prompt for audio output selection", error)
+        this.renderStatus("Unable to open speaker selector")
+        return null
       }
     },
 
@@ -472,12 +513,12 @@ let Hooks = {
       this.select.value = hasSelectedDevice ? selectedDeviceId : "default"
     },
 
-    async populateOutputDevices() {
+    async populateOutputDevices(preferredDeviceId) {
       if (!this.select) {
         return
       }
 
-      const savedDeviceId = window.localStorage.getItem(this.storageKey) || "default"
+      const savedDeviceId = preferredDeviceId || window.localStorage.getItem(this.storageKey) || "default"
 
       if (!window.isSecureContext) {
         this.setOptions([{deviceId: "default", label: this.defaultOptionLabel}], savedDeviceId)
@@ -495,7 +536,7 @@ let Hooks = {
 
       try {
         const devices = await navigator.mediaDevices.enumerateDevices()
-        const outputDevices = devices.filter((device) => device.kind === "audiooutput")
+        const outputDevices = devices.filter((device) => device.kind === "audiooutput" && device.deviceId !== "default")
 
         const options = [
           {deviceId: "default", label: this.defaultOptionLabel},
@@ -508,6 +549,10 @@ let Hooks = {
           })
         ]
 
+        if (this.canPromptForOutput) {
+          options.push({deviceId: this.pickOutputOptionValue, label: "Select output device..."})
+        }
+
         this.setOptions(options, savedDeviceId)
 
         this.select.disabled = !this.isSinkSelectionSupported
@@ -515,12 +560,23 @@ let Hooks = {
         if (!this.isSinkSelectionSupported) {
           const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
           this.renderStatus(isSafari
-            ? "Safari doesn't support output selection — use Chrome or Firefox. Mac: route audio in System Settings → Sound."
-            : "Your browser doesn't support audio output selection.")
+            ? "Safari does not support output selection. Use Chrome or Firefox."
+            : "Your browser does not support audio output selection.")
           return
         }
 
-        this.dispatchSelection(this.select.value || "default")
+        if (options.length <= 2 && this.canPromptForOutput) {
+          this.renderStatus("Only default output is visible. Use 'Select output device...' to grant speaker access.")
+        }
+
+        const selectedDeviceId = this.select.value || "default"
+
+        if (selectedDeviceId === this.pickOutputOptionValue) {
+          return
+        }
+
+        window.localStorage.setItem(this.storageKey, selectedDeviceId)
+        this.dispatchSelection(selectedDeviceId)
       } catch (error) {
         console.error("Unable to enumerate audio output devices", error)
         this.setOptions([{deviceId: "default", label: this.defaultOptionLabel}], savedDeviceId)
