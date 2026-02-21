@@ -197,22 +197,34 @@ let Hooks = {
         return {ok: false, reason: "player_unavailable"}
       }
 
-      const targetDeviceId = deviceId || "default"
+      const mediaElementDeviceId = !deviceId || deviceId === "default" ? "" : deviceId
+      const audioContextDeviceId = !deviceId || deviceId === "default" ? "default" : deviceId
+      let lastError = null
 
       try {
+        if (this.outputElement && typeof this.outputElement.setSinkId === "function") {
+          try {
+            await this.outputElement.setSinkId(mediaElementDeviceId)
+          } catch (error) {
+            lastError = error
+          }
+
+          if (!lastError) {
+            if (this.outputElement.paused) {
+              await this.outputElement.play()
+            }
+
+            return {ok: true}
+          }
+        }
+
         if (typeof this.player.audioCtx.setSinkId === "function") {
-          await this.player.audioCtx.setSinkId(targetDeviceId)
+          await this.player.audioCtx.setSinkId(audioContextDeviceId)
           return {ok: true}
         }
 
-        if (this.outputElement && typeof this.outputElement.setSinkId === "function") {
-          await this.outputElement.setSinkId(targetDeviceId)
-
-          if (this.outputElement.paused) {
-            await this.outputElement.play()
-          }
-
-          return {ok: true}
+        if (lastError) {
+          throw lastError
         }
 
         return {ok: false, reason: "unsupported"}
@@ -245,7 +257,7 @@ let Hooks = {
         typeof HTMLMediaElement.prototype.setSinkId === "function"
       )
 
-      if (mediaElementSupportsSink && typeof this.player.audioCtx.setSinkId !== "function") {
+      if (mediaElementSupportsSink) {
         try {
           const streamDestination = this.player.audioCtx.createMediaStreamDestination()
           this.player.gainNode.disconnect()
@@ -434,11 +446,25 @@ let Hooks = {
 
       if (this.select) {
         this.select.addEventListener("change", async () => {
-          const deviceId = this.select.value || "default"
+          const previousDeviceId = window.localStorage.getItem(this.storageKey) || "default"
+          let deviceId = this.select.value || "default"
 
           if (deviceId === this.pickOutputOptionValue) {
             const selected = await this.promptForOutputSelection()
-            await this.populateOutputDevices(selected ? selected.deviceId : undefined)
+            await this.populateOutputDevices(selected ? selected.deviceId : previousDeviceId)
+            return
+          }
+
+          if (deviceId !== "default" && this.canPromptForOutput) {
+            const selected = await this.promptForOutputSelection(deviceId)
+
+            if (!selected) {
+              await this.populateOutputDevices(previousDeviceId)
+              return
+            }
+
+            deviceId = selected.deviceId || deviceId
+            await this.populateOutputDevices(deviceId)
             return
           }
 
@@ -460,12 +486,16 @@ let Hooks = {
       }
     },
 
-    async promptForOutputSelection() {
+    async promptForOutputSelection(preferredDeviceId = null) {
       if (!this.canPromptForOutput) {
         return null
       }
 
       try {
+        if (preferredDeviceId && preferredDeviceId !== "default") {
+          return await navigator.mediaDevices.selectAudioOutput({deviceId: preferredDeviceId})
+        }
+
         return await navigator.mediaDevices.selectAudioOutput()
       } catch (error) {
         if (error && error.name === "NotAllowedError") {
