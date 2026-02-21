@@ -67,6 +67,34 @@ docker compose ps
 5. If input keeps reverting, close apps that may hold the mic (Teams/Zoom/Discord), then re-select your mic in open890.
 6. For remote hosts, use `https://`; device access is limited on insecure origins.
 
+### macOS install (Docker Desktop)
+
+Use this path for Mac users who want to run this fork locally with Docker.
+
+1. Install Docker Desktop for Mac (choose Apple Silicon or Intel build as appropriate).
+2. Install Git (or Xcode Command Line Tools).
+3. Open Terminal.
+4. Clone and start from your fork `main` branch:
+
+```zsh
+git clone https://github.com/w9fyi/open890.git
+cd open890
+git switch main
+docker compose up --build -d
+```
+
+5. Open `http://localhost:4000` in Chrome or Edge.
+6. To stop later:
+
+```zsh
+docker compose down
+```
+
+Notes:
+
+- For remote access and browser media device features, prefer `https://`.
+- In macOS, verify browser microphone permission in **System Settings -> Privacy & Security -> Microphone**.
+
 ## 3. Open the UI
 
 1. Open Chrome, Edge, or Safari.
