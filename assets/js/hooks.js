@@ -435,7 +435,7 @@ let Hooks = {
       }
 
       this.onDeviceChange = () => {
-        this.populateOutputDevices()
+        this.populateOutputDevices(window.localStorage.getItem(this.storageKey) || "default")
       }
 
       if (navigator.mediaDevices && typeof navigator.mediaDevices.addEventListener === "function") {
@@ -583,6 +583,7 @@ let Hooks = {
           options.push({deviceId: this.pickOutputOptionValue, label: "Select output device..."})
         }
 
+        const hasSavedDevice = options.some((option) => option.deviceId === savedDeviceId)
         this.setOptions(options, savedDeviceId)
 
         this.select.disabled = !this.isSinkSelectionSupported
@@ -597,6 +598,15 @@ let Hooks = {
 
         if (options.length <= 2 && this.canPromptForOutput) {
           this.renderStatus("Only default output is visible. Use 'Select output device...' to grant speaker access.")
+        }
+
+        if (!hasSavedDevice && savedDeviceId !== "default") {
+          if (this.canPromptForOutput) {
+            this.select.value = this.pickOutputOptionValue
+          }
+
+          this.renderStatus("Saved output device needs permission. Use 'Select output device...' to re-authorize it.")
+          return
         }
 
         const selectedDeviceId = this.select.value || "default"
@@ -855,8 +865,14 @@ let Hooks = {
           })
         )
 
+        const hasSavedDevice = options.some((option) => option.deviceId === savedDeviceId)
         this.setOptions(options, savedDeviceId)
         this.select.disabled = options.length === 1 && !this.canPromptForMicInput
+
+        if (!hasSavedDevice && savedDeviceId !== "default") {
+          this.renderStatus("Saved microphone not available. Re-authorize or choose it again.")
+          return
+        }
 
         const selectedDeviceId = this.select.value || "default"
         if (selectedDeviceId === this.pickInputOptionValue) {
