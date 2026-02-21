@@ -381,6 +381,7 @@ let Hooks = {
       this.select = this.el.querySelector("select")
       this.status = this.el.querySelector(".audio-output-status")
       this.storageKey = "open890.audio_output_device"
+      this.storageLabelKey = "open890.audio_output_device_label"
       this.defaultOptionLabel = "System Default"
       this.pickOutputOptionValue = "__pick_output_device__"
       this.canPromptForOutput = !!(
@@ -448,6 +449,9 @@ let Hooks = {
         this.select.addEventListener("change", async () => {
           const previousDeviceId = window.localStorage.getItem(this.storageKey) || "default"
           let deviceId = this.select.value || "default"
+          const selectedLabel = this.select.options[this.select.selectedIndex]
+            ? this.select.options[this.select.selectedIndex].text
+            : this.defaultOptionLabel
 
           if (deviceId === this.pickOutputOptionValue) {
             const selected = await this.promptForOutputSelection()
@@ -464,11 +468,12 @@ let Hooks = {
             }
 
             deviceId = selected.deviceId || deviceId
+            this.persistSelection(deviceId, selected.label || selectedLabel)
             await this.populateOutputDevices(deviceId)
             return
           }
 
-          window.localStorage.setItem(this.storageKey, deviceId)
+          this.persistSelection(deviceId, selectedLabel)
           this.dispatchSelection(deviceId)
         })
       }
@@ -525,6 +530,20 @@ let Hooks = {
       }))
     },
 
+    persistSelection(deviceId, label) {
+      const resolvedDeviceId = deviceId || "default"
+      window.localStorage.setItem(this.storageKey, resolvedDeviceId)
+
+      if (resolvedDeviceId === "default") {
+        window.localStorage.removeItem(this.storageLabelKey)
+        return
+      }
+
+      if (label && label.trim() !== "") {
+        window.localStorage.setItem(this.storageLabelKey, label)
+      }
+    },
+
     setOptions(options, selectedDeviceId) {
       if (!this.select) {
         return
@@ -549,6 +568,7 @@ let Hooks = {
       }
 
       const savedDeviceId = preferredDeviceId || window.localStorage.getItem(this.storageKey) || "default"
+      const savedDeviceLabel = window.localStorage.getItem(this.storageLabelKey) || ""
 
       if (!window.isSecureContext) {
         this.setOptions([{deviceId: "default", label: this.defaultOptionLabel}], savedDeviceId)
@@ -583,8 +603,27 @@ let Hooks = {
           options.push({deviceId: this.pickOutputOptionValue, label: "Select output device..."})
         }
 
-        const hasSavedDevice = options.some((option) => option.deviceId === savedDeviceId)
-        this.setOptions(options, savedDeviceId)
+        let resolvedDeviceId = savedDeviceId
+        let missingSavedDevice = false
+
+        if (resolvedDeviceId !== "default" && !options.some((option) => option.deviceId === resolvedDeviceId)) {
+          const labelMatch = savedDeviceLabel && savedDeviceLabel.trim() !== ""
+            ? options.find((option) => option.deviceId !== "default" && option.label === savedDeviceLabel)
+            : null
+
+          if (labelMatch) {
+            resolvedDeviceId = labelMatch.deviceId
+            this.persistSelection(labelMatch.deviceId, labelMatch.label)
+          } else {
+            const fallbackLabel = savedDeviceLabel && savedDeviceLabel.trim() !== ""
+              ? `${savedDeviceLabel} (reselect)`
+              : "Saved output (reselect)"
+            options.splice(1, 0, {deviceId: savedDeviceId, label: fallbackLabel})
+            missingSavedDevice = true
+          }
+        }
+
+        this.setOptions(options, resolvedDeviceId)
 
         this.select.disabled = !this.isSinkSelectionSupported
 
@@ -600,11 +639,7 @@ let Hooks = {
           this.renderStatus("Only default output is visible. Use 'Select output device...' to grant speaker access.")
         }
 
-        if (!hasSavedDevice && savedDeviceId !== "default") {
-          if (this.canPromptForOutput) {
-            this.select.value = this.pickOutputOptionValue
-          }
-
+        if (missingSavedDevice) {
           this.renderStatus("Saved output device needs permission. Use 'Select output device...' to re-authorize it.")
           return
         }
@@ -615,7 +650,10 @@ let Hooks = {
           return
         }
 
-        window.localStorage.setItem(this.storageKey, selectedDeviceId)
+        const selectedLabel = this.select.options[this.select.selectedIndex]
+          ? this.select.options[this.select.selectedIndex].text
+          : this.defaultOptionLabel
+        this.persistSelection(selectedDeviceId, selectedLabel)
         this.dispatchSelection(selectedDeviceId)
       } catch (error) {
         console.error("Unable to enumerate audio output devices", error)
@@ -637,6 +675,7 @@ let Hooks = {
       this.select = this.el.querySelector("select")
       this.status = this.el.querySelector(".audio-input-status")
       this.storageKey = "open890.mic_input_device"
+      this.storageLabelKey = "open890.mic_input_device_label"
       this.defaultOptionLabel = "System Default"
       this.pickInputOptionValue = "__pick_input_device__"
       this.pickInputOptionLabel = "Enable microphone list..."
@@ -696,6 +735,9 @@ let Hooks = {
         this.select.addEventListener("change", async () => {
           const requestedDeviceId = this.select.value || "default"
           const previousDeviceId = window.localStorage.getItem(this.storageKey) || "default"
+          const selectedLabel = this.select.options[this.select.selectedIndex]
+            ? this.select.options[this.select.selectedIndex].text
+            : this.defaultOptionLabel
 
           if (requestedDeviceId === this.pickInputOptionValue) {
             this.hasRequestedMicPermission = true
@@ -729,12 +771,12 @@ let Hooks = {
             }
 
             this.renderStatus("Switching microphone...")
-            window.localStorage.setItem(this.storageKey, requestedDeviceId)
+            this.persistSelection(requestedDeviceId, selectedLabel)
             await this.populateInputDevices(requestedDeviceId)
             return
           }
 
-          window.localStorage.setItem(this.storageKey, "default")
+          this.persistSelection("default", this.defaultOptionLabel)
           this.dispatchSelection("default")
         })
       }
@@ -760,6 +802,20 @@ let Hooks = {
       window.dispatchEvent(new CustomEvent("open890:set-mic-input", {
         detail: {deviceId: deviceId || "default"}
       }))
+    },
+
+    persistSelection(deviceId, label) {
+      const resolvedDeviceId = deviceId || "default"
+      window.localStorage.setItem(this.storageKey, resolvedDeviceId)
+
+      if (resolvedDeviceId === "default") {
+        window.localStorage.removeItem(this.storageLabelKey)
+        return
+      }
+
+      if (label && label.trim() !== "") {
+        window.localStorage.setItem(this.storageLabelKey, label)
+      }
     },
 
     async requestMicrophonePermission() {
@@ -822,6 +878,7 @@ let Hooks = {
       }
 
       const savedDeviceId = preferredDeviceId || window.localStorage.getItem(this.storageKey) || "default"
+      const savedDeviceLabel = window.localStorage.getItem(this.storageLabelKey) || ""
 
       if (!window.isSecureContext) {
         this.setOptions([{deviceId: "default", label: this.defaultOptionLabel}], savedDeviceId)
@@ -865,11 +922,30 @@ let Hooks = {
           })
         )
 
-        const hasSavedDevice = options.some((option) => option.deviceId === savedDeviceId)
-        this.setOptions(options, savedDeviceId)
+        let resolvedDeviceId = savedDeviceId
+        let missingSavedDevice = false
+
+        if (resolvedDeviceId !== "default" && !options.some((option) => option.deviceId === resolvedDeviceId)) {
+          const labelMatch = savedDeviceLabel && savedDeviceLabel.trim() !== ""
+            ? options.find((option) => option.deviceId !== "default" && option.label === savedDeviceLabel)
+            : null
+
+          if (labelMatch) {
+            resolvedDeviceId = labelMatch.deviceId
+            this.persistSelection(labelMatch.deviceId, labelMatch.label)
+          } else {
+            const fallbackLabel = savedDeviceLabel && savedDeviceLabel.trim() !== ""
+              ? `${savedDeviceLabel} (reselect)`
+              : "Saved microphone (reselect)"
+            options.splice(1, 0, {deviceId: savedDeviceId, label: fallbackLabel})
+            missingSavedDevice = true
+          }
+        }
+
+        this.setOptions(options, resolvedDeviceId)
         this.select.disabled = options.length === 1 && !this.canPromptForMicInput
 
-        if (!hasSavedDevice && savedDeviceId !== "default") {
+        if (missingSavedDevice) {
           this.renderStatus("Saved microphone not available. Re-authorize or choose it again.")
           return
         }
@@ -880,7 +956,10 @@ let Hooks = {
           return
         }
 
-        window.localStorage.setItem(this.storageKey, selectedDeviceId)
+        const selectedLabel = this.select.options[this.select.selectedIndex]
+          ? this.select.options[this.select.selectedIndex].text
+          : this.defaultOptionLabel
+        this.persistSelection(selectedDeviceId, selectedLabel)
         this.dispatchSelection(selectedDeviceId)
 
         if (!hasNamedInputs && this.canPromptForMicInput && inputDevices.length > 0) {
