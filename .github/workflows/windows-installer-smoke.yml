@@ -1,0 +1,172 @@
+name: Windows Installer Smoke Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      installer_url:
+        description: "Direct URL to installer .exe"
+        required: true
+        default: "https://github.com/w9fyi/open890/releases/download/v0.1.5/open890-v0.1.5-setup.exe"
+      app_url:
+        description: "URL to probe for readiness"
+        required: true
+        default: "http://localhost:4000"
+      timeout_seconds:
+        description: "Seconds to wait for open890 readiness"
+        required: true
+        default: "90"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    steps:
+      - name: Download installer
+        shell: powershell
+        run: |
+          $ProgressPreference = "SilentlyContinue"
+          $installerPath = Join-Path $env:RUNNER_TEMP "open890-setup.exe"
+          Invoke-WebRequest -Uri "${{ inputs.installer_url }}" -OutFile $installerPath
+          "INSTALLER_PATH=$installerPath" >> $env:GITHUB_ENV
+
+      - name: Run installer silently
+        shell: powershell
+        run: |
+          $installLog = Join-Path $env:RUNNER_TEMP "open890-install.log"
+          $args = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /LOG=`"$installLog`""
+          $proc = Start-Process -FilePath $env:INSTALLER_PATH -ArgumentList $args -Wait -PassThru
+
+          "INSTALL_LOG=$installLog" >> $env:GITHUB_ENV
+          "INSTALL_EXIT_CODE=$($proc.ExitCode)" >> $env:GITHUB_ENV
+
+          if ($proc.ExitCode -ne 0) {
+            throw "Installer exited with non-zero code: $($proc.ExitCode)"
+          }
+
+      - name: Locate install directory
+        shell: powershell
+        run: |
+          $candidates = @(
+            "$env:ProgramFiles\open890",
+            "${env:ProgramFiles(x86)}\open890"
+          )
+
+          $installRoot = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+          if (-not $installRoot) {
+            throw "open890 install directory was not found under Program Files."
+          }
+
+          "INSTALL_ROOT=$installRoot" >> $env:GITHUB_ENV
+
+      - name: Verify expected installed files
+        shell: powershell
+        run: |
+          $required = @(
+            "$env:INSTALL_ROOT\open890-launcher.bat",
+            "$env:INSTALL_ROOT\open890-launcher.ps1",
+            "$env:INSTALL_ROOT\bin\open890.bat"
+          )
+
+          foreach ($path in $required) {
+            if (!(Test-Path $path)) {
+              throw "Missing required installed file: $path"
+            }
+          }
+
+      - name: Start open890 and wait for readiness
+        shell: powershell
+        run: |
+          $appUrl = "${{ inputs.app_url }}"
+          $timeoutSeconds = [int]"${{ inputs.timeout_seconds }}"
+          $serverLog = Join-Path $env:TEMP "open890-server.log"
+          $startLog = Join-Path $env:RUNNER_TEMP "open890-start.log"
+          $ready = $false
+
+          if (Test-Path $serverLog) {
+            Remove-Item -Path $serverLog -Force
+          }
+
+          cmd.exe /c "`"$env:INSTALL_ROOT\bin\open890.bat`" start > `"$startLog`" 2>&1"
+
+          for ($i = 0; $i -lt $timeoutSeconds; $i++) {
+            try {
+              $response = Invoke-WebRequest -UseBasicParsing -Uri $appUrl -TimeoutSec 2
+              if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) {
+                $ready = $true
+                break
+              }
+            } catch {
+              # keep waiting
+            }
+
+            Start-Sleep -Seconds 1
+          }
+
+          "OPEN890_SERVER_LOG=$serverLog" >> $env:GITHUB_ENV
+          "OPEN890_START_LOG=$startLog" >> $env:GITHUB_ENV
+
+          if (-not $ready) {
+            throw "open890 did not become ready at $appUrl within $timeoutSeconds seconds."
+          }
+
+      - name: Stop open890
+        if: always()
+        shell: powershell
+        run: |
+          cmd.exe /c "`"$env:INSTALL_ROOT\bin\open890.bat`" stop" 2>&1 | Out-Null
+
+      - name: Collect diagnostics
+        if: always()
+        shell: powershell
+        run: |
+          $diagDir = Join-Path $env:RUNNER_TEMP "open890-smoke-diagnostics"
+          New-Item -Path $diagDir -ItemType Directory -Force | Out-Null
+
+          if (Test-Path $env:INSTALL_LOG) {
+            Copy-Item -Path $env:INSTALL_LOG -Destination (Join-Path $diagDir "open890-install.log") -Force
+          }
+
+          if (Test-Path $env:OPEN890_START_LOG) {
+            Copy-Item -Path $env:OPEN890_START_LOG -Destination (Join-Path $diagDir "open890-start.log") -Force
+          }
+
+          if (Test-Path $env:OPEN890_SERVER_LOG) {
+            Copy-Item -Path $env:OPEN890_SERVER_LOG -Destination (Join-Path $diagDir "open890-server.log") -Force
+          }
+
+          $launcherDirListing = Join-Path $diagDir "install-dir-listing.txt"
+          if (Test-Path $env:INSTALL_ROOT) {
+            Get-ChildItem -Path $env:INSTALL_ROOT -Recurse -Depth 2 -Force |
+              Select-Object FullName, Length, LastWriteTime |
+              Format-Table -AutoSize |
+              Out-File -FilePath $launcherDirListing -Encoding UTF8
+          }
+
+          $eventLogPath = Join-Path $diagDir "windows-application-events.txt"
+          Get-WinEvent -LogName Application -MaxEvents 600 -ErrorAction SilentlyContinue |
+            Where-Object { $_.Message -match 'open890|beam|erlang|vcruntime|ucrtbase' } |
+            Select-Object TimeCreated, ProviderName, Id, LevelDisplayName, Message |
+            Format-List |
+            Out-File -FilePath $eventLogPath -Encoding UTF8
+
+          $summary = Join-Path $diagDir "summary.txt"
+          @(
+            "installer_url=${{ inputs.installer_url }}",
+            "app_url=${{ inputs.app_url }}",
+            "timeout_seconds=${{ inputs.timeout_seconds }}",
+            "install_root=$env:INSTALL_ROOT",
+            "install_exit_code=$env:INSTALL_EXIT_CODE"
+          ) | Out-File -FilePath $summary -Encoding UTF8
+
+          "DIAG_DIR=$diagDir" >> $env:GITHUB_ENV
+
+      - name: Upload diagnostics artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-smoke-diagnostics
+          path: ${{ env.DIAG_DIR }}
+          if-no-files-found: error
