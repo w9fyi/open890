@@ -88,6 +88,26 @@ Archive fallback:
 
 If macOS blocks execution, adjust your Privacy/Security settings to allow the app/script and retry.
 
+If you get a "permission denied" error on launch, verify executable bits:
+
+```bash
+ls -l \
+  /Applications/open890/open890.command \
+  /Applications/open890/open890-stop.command \
+  /Applications/open890/open890-launcher-macos.sh \
+  /Applications/open890/bin/open890
+```
+
+If any of those files do not have `x` permissions, fix with:
+
+```bash
+sudo chmod +x \
+  /Applications/open890/open890.command \
+  /Applications/open890/open890-stop.command \
+  /Applications/open890/open890-launcher-macos.sh \
+  /Applications/open890/bin/open890
+```
+
 ## Linux (Ubuntu) Quick Start
 
 1. Download the Ubuntu x64 release archive from:

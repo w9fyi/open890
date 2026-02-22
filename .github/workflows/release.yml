@@ -226,6 +226,27 @@ jobs:
           PKGROOT="$RUNNER_TEMP/pkgroot"
           mkdir -p "$PKGROOT/Applications/open890"
           cp -R _build/prod/rel/open890/. "$PKGROOT/Applications/open890/"
+
+          # Normalize and validate executable permissions for launch scripts.
+          REQUIRED_EXECUTABLES=(
+            "$PKGROOT/Applications/open890/open890.command"
+            "$PKGROOT/Applications/open890/open890-stop.command"
+            "$PKGROOT/Applications/open890/open890-launcher-macos.sh"
+            "$PKGROOT/Applications/open890/bin/open890"
+          )
+
+          for target in "${REQUIRED_EXECUTABLES[@]}"; do
+            if [[ ! -e "$target" ]]; then
+              echo "Missing expected executable: $target" >&2
+              exit 1
+            fi
+            chmod 755 "$target"
+            if [[ ! -x "$target" ]]; then
+              echo "Failed to mark executable: $target" >&2
+              exit 1
+            fi
+          done
+
           pkgbuild \
             --root "$PKGROOT" \
             --identifier "org.open890.pkg" \

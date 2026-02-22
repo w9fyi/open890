@@ -177,6 +177,8 @@ After changing the security setting:
 * The launcher starts open890 in the background, opens your browser to `http://localhost:4000`, and shows a status dialog
 * Stop open890 with `/Applications/open890/open890-stop.command`
 * If using the archive, use `open890.command` to start and `open890-stop.command` to stop
+* If launch fails with `permission denied`, run:
+  `sudo chmod +x /Applications/open890/open890.command /Applications/open890/open890-stop.command /Applications/open890/open890-launcher-macos.sh /Applications/open890/bin/open890`
 
 
 ### Linux (Ubuntu)
