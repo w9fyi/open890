@@ -170,9 +170,11 @@ Navigate to Settings -> Privacy & Security -> Allow applications downloaded from
 
 After changing the security setting:
 
-* Download an unzip the MacOS binary build to somewhere useful (i.e. your Desktop)
-* Double-click the `open890.command` file, or you can start a terminal, `cd` to the open890 directory, and run `./open890.command`
-    * If you are on an earlier version of MacOS, `open890.sh` may also work.
+* Preferred: Download and run the unsigned macOS installer package `open890-<version>-macos-installer.pkg`
+* Alternative: Download and unzip the macOS binary archive to somewhere useful (for example your Desktop)
+* If installed via `.pkg`, open890 is installed to `/Applications/open890`
+* Start with `/Applications/open890/open890.command` (or `open890.sh` on older systems)
+* If using the archive, double-click `open890.command`, or run it from Terminal
 
 
 ### Linux (Ubuntu)
@@ -218,7 +220,8 @@ This does the following:
 3. Triggers GitHub Actions release workflow.
 4. Builds and publishes Windows, macOS, and Ubuntu assets in the same release.
 5. Publishes the Windows installer (`open890-<tag>-setup.exe`).
-6. Publishes the first-time setup guide as a release asset.
+6. Publishes the unsigned macOS installer (`open890-<tag>-macos-installer.pkg`).
+7. Publishes the first-time setup guide as a release asset.
 
 Requirements:
 

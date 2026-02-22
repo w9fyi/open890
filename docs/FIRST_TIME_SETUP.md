@@ -73,10 +73,17 @@ Allow access on **Private networks** so local browser access works.
 
 1. Download the macOS release archive from:
    - https://github.com/w9fyi/open890/releases/latest
+2. Preferred: run `open890-<version>-macos-installer.pkg` (unsigned installer).
+3. If prompted by macOS security, allow it from Privacy & Security and continue.
+4. Start with `/Applications/open890/open890.command`.
+5. Open:
+   - http://localhost:4000
+
+Archive fallback:
+
+1. Download `open890-<version>-macos.tar.gz`.
 2. Extract it.
 3. Start with `open890.command`.
-4. Open:
-   - http://localhost:4000
 
 If macOS blocks execution, adjust your Privacy/Security settings to allow the app/script and retry.
 

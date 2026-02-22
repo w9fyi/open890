@@ -219,11 +219,32 @@ jobs:
             ./open890
           outPath: /tmp/open890-${{ steps.vars.outputs.TAG }}-macos.tar.gz
 
+      - name: Build unsigned macOS pkg installer
+        run: |
+          TAG="${{ steps.vars.outputs.TAG }}"
+          VERSION="${TAG#v}"
+          PKGROOT="$RUNNER_TEMP/pkgroot"
+          mkdir -p "$PKGROOT/Applications/open890"
+          cp -R _build/prod/rel/open890/. "$PKGROOT/Applications/open890/"
+          pkgbuild \
+            --root "$PKGROOT" \
+            --identifier "org.open890.pkg" \
+            --version "$VERSION" \
+            --install-location "/" \
+            "/tmp/open890-${TAG}-macos-installer.pkg"
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-macos
           path: /tmp/open890-${{ steps.vars.outputs.TAG }}-macos.tar.gz
+          if-no-files-found: error
+
+      - name: Upload macOS pkg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-pkg
+          path: /tmp/open890-${{ steps.vars.outputs.TAG }}-macos-installer.pkg
           if-no-files-found: error
 
   publish-release:
@@ -256,6 +277,12 @@ jobs:
           name: release-macos
           path: dist
 
+      - name: Download macOS pkg artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-macos-pkg
+          path: dist
+
       - name: Copy release documentation
         run: |
           cp docs/FIRST_TIME_SETUP.md dist/open890-FIRST_TIME_SETUP.md
@@ -267,5 +294,6 @@ jobs:
             dist/open890-*.tar.gz
             dist/open890-*.zip
             dist/open890-*.exe
+            dist/open890-*.pkg
             dist/open890-FIRST_TIME_SETUP.md
           generate_release_notes: true
