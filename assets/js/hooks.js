@@ -1315,6 +1315,24 @@ let Hooks = {
       return 255
     },
 
+    minValue() {
+      if (this.rangeInput) {
+        const inputMin = Number(this.rangeInput.min)
+
+        if (Number.isFinite(inputMin)) {
+          return inputMin
+        }
+      }
+
+      const parsed = Number(this.el.dataset.minValue)
+
+      if (Number.isFinite(parsed)) {
+        return parsed
+      }
+
+      return 0
+    },
+
     stepValue() {
       if (this.rangeInput) {
         const inputStep = Number(this.rangeInput.step)
@@ -1352,7 +1370,7 @@ let Hooks = {
     },
 
     clamp(value) {
-      return Math.max(0, Math.min(this.maxValue(), value))
+      return Math.max(this.minValue(), Math.min(this.maxValue(), value))
     },
 
     applyValue(value) {
