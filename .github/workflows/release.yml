@@ -164,7 +164,7 @@ jobs:
           if-no-files-found: error
 
   build-macos:
-    runs-on: macos-13
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -177,7 +177,7 @@ jobs:
       - name: Install OTP and Elixir
         uses: erlef/setup-beam@v1
         with:
-          otp-version: ${{ env.OTP_VERSION }}
+          otp-version: '25'
           elixir-version: ${{ env.ELIXIR_VERSION }}
 
       - name: Install NodeJS
