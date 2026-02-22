@@ -128,7 +128,10 @@ jobs:
         if: always()
         shell: powershell
         run: |
-          cmd.exe /c "`"$env:INSTALL_ROOT\bin\open890.bat`" stop" 2>&1 | Out-Null
+          $stopScript = "$env:INSTALL_ROOT\bin\open890.bat"
+          if (Test-Path $stopScript) {
+            cmd.exe /c "`"$stopScript`" stop" 2>&1 | Out-Null
+          }
 
       - name: Collect diagnostics
         if: always()
@@ -136,16 +139,17 @@ jobs:
         run: |
           $diagDir = Join-Path $env:RUNNER_TEMP "open890-smoke-diagnostics"
           New-Item -Path $diagDir -ItemType Directory -Force | Out-Null
+          "DIAG_DIR=$diagDir" >> $env:GITHUB_ENV
 
           if (Test-Path $env:INSTALL_LOG) {
             Copy-Item -Path $env:INSTALL_LOG -Destination (Join-Path $diagDir "open890-install.log") -Force
           }
 
-          if (Test-Path $env:OPEN890_START_LOG) {
+          if ($env:OPEN890_START_LOG -and (Test-Path $env:OPEN890_START_LOG)) {
             Copy-Item -Path $env:OPEN890_START_LOG -Destination (Join-Path $diagDir "open890-start.log") -Force
           }
 
-          if (Test-Path $env:OPEN890_SERVER_LOG) {
+          if ($env:OPEN890_SERVER_LOG -and (Test-Path $env:OPEN890_SERVER_LOG)) {
             Copy-Item -Path $env:OPEN890_SERVER_LOG -Destination (Join-Path $diagDir "open890-server.log") -Force
           }
 
@@ -172,8 +176,6 @@ jobs:
             "install_root=$env:INSTALL_ROOT",
             "install_exit_code=$env:INSTALL_EXIT_CODE"
           ) | Out-File -FilePath $summary -Encoding UTF8
-
-          "DIAG_DIR=$diagDir" >> $env:GITHUB_ENV
 
       - name: Upload diagnostics artifact
         if: always()
