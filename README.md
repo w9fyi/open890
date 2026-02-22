@@ -197,6 +197,28 @@ If all else fails, install from source.
 Binary builds are not available for Raspberry Pi due to CPU architecture differences. You will need to install from source (see above)
 in order to get open890 running on a RPi.
 
+## Maintainer Release Process
+
+If you are publishing a new release, use one command:
+
+```bash
+make publish_release VERSION=v0.1.4
+```
+
+This does the following:
+
+1. Pushes your current branch.
+2. Creates and pushes the release tag.
+3. Triggers GitHub Actions release workflow.
+4. Builds and publishes Windows, macOS, and Ubuntu assets in the same release.
+5. Publishes the first-time setup guide as a release asset.
+
+Requirements:
+
+- Clean git working tree (no uncommitted changes).
+- Push access to `w9fyi/open890`.
+- Repository secrets configured for build (`SECRET_KEY_BASE`).
+
 ## Network Settings & Security
 
 By default, open890 runs a web server on port `4000` and binds to `0.0.0.0` (all interfaces) on the machine it runs on.

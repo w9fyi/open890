@@ -1,4 +1,4 @@
-.PHONY: all clean clean_elixir deps up install_tools yarn_install build_docker run_docker
+.PHONY: all clean clean_elixir deps up install_tools yarn_install build_docker run_docker publish_release
 
 all: clean build yarn_install
 
@@ -54,3 +54,7 @@ release:
 	yarn install --cwd assets
 	mix assets.deploy
 	MIX_ENV=prod mix release
+
+publish_release:
+	@if [ -z "$(VERSION)" ]; then echo "VERSION is required. Usage: make publish_release VERSION=v0.1.4"; exit 1; fi
+	./scripts/publish_release.sh $(VERSION)

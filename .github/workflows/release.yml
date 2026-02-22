@@ -3,55 +3,45 @@ name: Release
 on:
   push:
     tags:
-      - '*'
+      - 'v*'
 
 permissions:
   contents: write
 
-jobs:
-  create_release:
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.upload_url }}
-    steps:
-      - name: Create Github Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref }}
-          draft: false
-          prerelease: ${{ endsWith(github.ref, '-pre') }}
+env:
+  OTP_VERSION: '24.3.4'
+  ELIXIR_VERSION: '1.14.2'
+  NODE_VERSION: '18.12.1'
 
-  release-ubuntu:
-    needs: [create_release]
+jobs:
+  build-ubuntu:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ github.head_ref }}
-      - name: Set output
+      - uses: actions/checkout@v4
+
+      - name: Set vars
         id: vars
         run: |
-          echo "TAG=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
-          cat $GITHUB_OUTPUT
+          echo "TAG=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
       - name: Install OTP and Elixir
         uses: erlef/setup-beam@v1
         with:
-          otp-version: 24.3.4
-          elixir-version: 1.14.2
+          otp-version: ${{ env.OTP_VERSION }}
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+
       - name: Install NodeJS
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 18.12.1
+          node-version: ${{ env.NODE_VERSION }}
+
       - name: Install Dependencies
-        if: steps.mix-cache.outputs.cache-hit != 'true'
         run: |
           mix local.rebar --force
           mix local.hex --force
           mix deps.get --only prod
+
       - name: Compile Web Assets
         run: |
           yarn install --cwd assets
@@ -59,16 +49,19 @@ jobs:
         env:
           MIX_ENV: prod
           SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
-      - name: mix release
+
+      - name: Build release
         run: |
           mix release
         env:
           MIX_ENV: prod
           SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
+
       - name: Include first-time setup guide in bundle
         run: |
           cp docs/FIRST_TIME_SETUP.md _build/prod/rel/open890/FIRST_TIME_SETUP.md
-      - name: Compress files
+
+      - name: Compress release
         uses: master-atul/tar-action@v1.1.2
         with:
           command: c
@@ -76,193 +69,174 @@ jobs:
           files: |
             ./open890
           outPath: /tmp/open890-${{ steps.vars.outputs.TAG }}-ubuntu-x64.tar.gz
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: /tmp/open890-${{ steps.vars.outputs.TAG }}-ubuntu-x64.tar.gz
-          asset_name: open890-${{ steps.vars.outputs.TAG }}-ubuntu-x64.tar.gz
-          tag: ${{ steps.vars.outputs.TAG }}
-      - name: Upload first-time setup guide
-        id: upload-release-guide
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: docs/FIRST_TIME_SETUP.md
-          asset_name: open890-FIRST_TIME_SETUP.md
-          tag: ${{ steps.vars.outputs.TAG }}
-          overwrite: true
-      - name: Upload Release Asset to S3 (optional)
-        id: upload-release-asset-s3
-        continue-on-error: true
-        run: |
-          aws s3 cp /tmp/open890-${{ steps.vars.outputs.TAG }}-ubuntu-x64.tar.gz s3://${{ secrets.AWS_S3_BUCKET }}/${{ secrets.AWS_S3_BUCKET_PATH }}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_S3_REGION }}
-          AWS_EC2_METADATA_DISABLED: true
 
-  #release-macos:
-  #  needs: [create_release]
-  #  runs-on: macos-latest
-  #  steps:
-  #    - uses: actions/checkout@v3
-  #      with:
-  #        ref: ${{ github.head_ref }}
-  #    - name: Set output
-  #      id: vars
-  #      run: |
-  #        echo "TAG=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
-  #        cat $GITHUB_OUTPUT
-  #    - name: Install asdf via homebrew
-  #      run: |
-  #        brew install asdf coreutils automake autoconf libyaml readline libxslt libtool
-  #        brew install openssl@1.1
-  #        mkdir -p ~/.asdf/installs/erlang
-  #    - name: Show openssl prefix
-  #      run: |
-  #        brew --prefix openssl@1.1
-  #    - name: Action-cache asdf erlang build
-  #      uses: actions/cache@v3
-  #      with:
-  #        path: ~/.asdf/installs/erlang
-  #        key: ${{ runner.os }}-${{ hashFiles('.tool-versions') }}
-  #    - name: Install OTP and Elixir via asdf
-  #      env:
-  #        KERL_CONFIGURE_OPTIONS: "--disable-dynamic-ssl-lib --without-javac --with-ssl=/usr/local/opt/openssl@1.1"
-  #      run: |
-  #        make install_tools
-  #        asdf reshim erlang
-  #    # - name: Cache asdf Erlang build to S3
-  #    #   run: |
-  #    #     cd ~/.asdf/installs/erlang && tar zcvf /tmp/asdf-erlang-install-macos.tar.gz ~/.asdf/installs/erlang/
-  #    #     aws s3 cp /tmp/asdf-erlang-install-macos.tar.gz s3://${{ secrets.AWS_S3_BUCKET }}/build_tmp/
-  #    #   env:
-  #    #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #    #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  #    #     AWS_DEFAULT_REGION: ${{ secrets.AWS_S3_REGION }}
-  #    #     AWS_EC2_METADATA_DISABLED: true
-  #    - name: Install Dependencies
-  #      if: steps.mix-cache.outputs.cache-hit != 'true'
-  #      run: |
-  #        export PATH=~/.asdf/shims:$PATH
-  #        mix local.rebar --force
-  #        mix local.hex --force
-  #        mix deps.get --only prod
-  #    - name: Compile Web Assets
-  #      run: |
-  #        export PATH=~/.asdf/shims:$PATH
-  #        yarn install --cwd assets
-  #        mix assets.deploy
-  #      env:
-  #        MIX_ENV: prod
-  #        SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
-  #    - name: mix release
-  #      run: |
-  #        export PATH=~/.asdf/shims:$PATH
-  #        mix release
-  #      env:
-  #        MIX_ENV: prod
-  #        SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
-  #    - name: Compress files
-  #      uses: master-atul/tar-action@v1.1.2
-  #      with:
-  #        command: c
-  #        cwd: ./_build/prod/rel
-  #        files: |
-  #          ./open890
-  #        outPath: /tmp/open890-${{ steps.vars.outputs.TAG }}-macos-intel.tar.gz
-  #    - name: Output release checksum
-  #      run: |
-  #        echo "::set-output name=sha256_linux::$(sha256sum /tmp/open890-${{ steps.vars.outputs.TAG }}-macos-intel.tar.gz)"
-  #    - name: Upload Release Asset
-  #      id: upload-release-asset
-  #      uses: svenstaro/upload-release-action@v2
-  #      with:
-  #        repo_token: ${{ secrets.GITHUB_TOKEN }}
-  #        file: /tmp/open890-${{ steps.vars.outputs.TAG }}-macos-intel.tar.gz
-  #        asset_name: open890-${{ steps.vars.outputs.TAG }}-macos-intel.tar.gz
-  #        tag: ${{ steps.vars.outputs.TAG }}
-  #    - name: Upload Release Asset to S3
-  #      id: upload-release-asset-s3
-  #      run: |
-  #        aws s3 cp /tmp/open890-${{ steps.vars.outputs.TAG }}-macos-intel.tar.gz s3://${{ secrets.AWS_S3_BUCKET }}/${{ secrets.AWS_S3_BUCKET_PATH }}
-  #      env:
-  #        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  #        AWS_DEFAULT_REGION: ${{ secrets.AWS_S3_REGION }}
-  #        AWS_EC2_METADATA_DISABLED: true
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-ubuntu
+          path: /tmp/open890-${{ steps.vars.outputs.TAG }}-ubuntu-x64.tar.gz
+          if-no-files-found: error
 
-  release-windows:
-    needs: [create_release]
+  build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ github.head_ref }}
-      - name: Set output
-        shell: bash
+      - uses: actions/checkout@v4
+
+      - name: Set vars
         id: vars
+        shell: bash
         run: |
-          echo "TAG=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
-          cat $GITHUB_OUTPUT
+          echo "TAG=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
       - name: Install Erlang and Elixir
         env:
-          ERLANG_VERSION: 24.3.4
-          ELIXIR_VERSION: 1.14.2
+          ERLANG_VERSION: ${{ env.OTP_VERSION }}
+          ELIXIR_VERSION: ${{ env.ELIXIR_VERSION }}
         run: |
-          build_scripts\win64\install_elixir.ps1;
-          echo "c:\erlang\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append;
-          echo "c:\elixir\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append;
+          build_scripts\win64\install_elixir.ps1
+          echo "c:\erlang\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "c:\elixir\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install NodeJS
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
       - name: Install Dependencies
         run: |
           mix local.rebar --force
           mix local.hex --force
           mix deps.get --only prod
-      - name: Install node dependencies
-        working-directory: assets
+
+      - name: Compile Web Assets
         run: |
           yarn install --cwd assets
-        env:
-          MIX_ENV: prod
-          SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
-      - name: mix assets.deploy.windows
-        run: |
           mix assets.deploy.windows
         env:
           MIX_ENV: prod
           SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
-      - name: mix release
+
+      - name: Build release
         run: |
           mix release
         env:
           MIX_ENV: prod
           SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
+
       - name: Include first-time setup guide in bundle
         run: |
           Copy-Item -Path docs/FIRST_TIME_SETUP.md -Destination _build\prod\rel\open890\FIRST_TIME_SETUP.md -Force
-      - name: Compress files
+
+      - name: Compress release
         run: |
           cd _build\prod\rel
           7z a ..\..\..\open890-${{ steps.vars.outputs.TAG }}-windows-x64.zip open890\
           cd ..\..\..
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: svenstaro/upload-release-action@v2
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: open890-${{ steps.vars.outputs.TAG }}-windows-x64.zip
-          asset_name: open890-${{ steps.vars.outputs.TAG }}-windows-x64.zip
-          tag: ${{ steps.vars.outputs.TAG }}
-      - name: Upload Release Asset to S3 (optional)
-        id: upload-release-asset-s3
-        continue-on-error: true
+          name: release-windows
+          path: open890-${{ steps.vars.outputs.TAG }}-windows-x64.zip
+          if-no-files-found: error
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set vars
+        id: vars
         run: |
-          aws s3 cp open890-${{ steps.vars.outputs.TAG }}-windows-x64.zip s3://${{ secrets.AWS_S3_BUCKET }}/${{ secrets.AWS_S3_BUCKET_PATH }}
+          echo "TAG=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+      - name: Install OTP and Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ env.OTP_VERSION }}
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+
+      - name: Install NodeJS
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Dependencies
+        run: |
+          mix local.rebar --force
+          mix local.hex --force
+          mix deps.get --only prod
+
+      - name: Compile Web Assets
+        run: |
+          yarn install --cwd assets
+          mix assets.deploy
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_S3_REGION }}
-          AWS_EC2_METADATA_DISABLED: true
+          MIX_ENV: prod
+          SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
+
+      - name: Build release
+        run: |
+          mix release
+        env:
+          MIX_ENV: prod
+          SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
+
+      - name: Include first-time setup guide in bundle
+        run: |
+          cp docs/FIRST_TIME_SETUP.md _build/prod/rel/open890/FIRST_TIME_SETUP.md
+
+      - name: Compress release
+        uses: master-atul/tar-action@v1.1.2
+        with:
+          command: c
+          cwd: ./_build/prod/rel
+          files: |
+            ./open890
+          outPath: /tmp/open890-${{ steps.vars.outputs.TAG }}-macos.tar.gz
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: /tmp/open890-${{ steps.vars.outputs.TAG }}-macos.tar.gz
+          if-no-files-found: error
+
+  publish-release:
+    needs: [build-ubuntu, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Ubuntu artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-ubuntu
+          path: dist
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-windows
+          path: dist
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-macos
+          path: dist
+
+      - name: Copy release documentation
+        run: |
+          cp docs/FIRST_TIME_SETUP.md dist/open890-FIRST_TIME_SETUP.md
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/open890-*.tar.gz
+            dist/open890-*.zip
+            dist/open890-FIRST_TIME_SETUP.md
+          generate_release_notes: true
