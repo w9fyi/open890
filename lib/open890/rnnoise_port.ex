@@ -215,8 +215,17 @@ defmodule Open890.RNNoisePort do
   end
 
   defp default_executable do
-    :code.priv_dir(:open890)
-    |> Path.join("bin/open890_rnnoise_filter")
-    |> to_string()
+    priv_dir =
+      case :code.priv_dir(:open890) do
+        dir when is_list(dir) -> to_string(dir)
+        _ -> "priv"
+      end
+
+    candidates = [
+      Path.join(priv_dir, "bin/open890_rnnoise_filter"),
+      Path.join(priv_dir, "bin/open890_rnnoise_filter_static")
+    ]
+
+    Enum.find(candidates, &File.exists?/1) || hd(candidates)
   end
 end

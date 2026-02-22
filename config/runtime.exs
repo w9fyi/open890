@@ -48,10 +48,25 @@ if config_env() in [:dev, :prod] do
     |> max(5)
     |> min(1000)
 
+  priv_dir =
+    case :code.priv_dir(:open890) do
+      dir when is_list(dir) -> to_string(dir)
+      _ -> Path.expand("../priv", __DIR__)
+    end
+
+  pick_default_executable = fn candidates ->
+    Enum.find(candidates, &File.exists?/1) || hd(candidates)
+  end
+
   rnnoise_executable =
     System.get_env(
       "OPEN890_RNNOISE_BIN",
-      Path.expand("../priv/bin/open890_rnnoise_filter", __DIR__)
+      pick_default_executable.([
+        Path.join(priv_dir, "bin/open890_rnnoise_filter"),
+        Path.join(priv_dir, "bin/open890_rnnoise_filter_static"),
+        Path.expand("../priv/bin/open890_rnnoise_filter", __DIR__),
+        Path.expand("../priv/bin/open890_rnnoise_filter_static", __DIR__)
+      ])
     )
 
   config :open890, Open890.RNNoisePort,
@@ -89,7 +104,10 @@ if config_env() in [:dev, :prod] do
   ft8_executable =
     System.get_env(
       "OPEN890_FT8_BIN",
-      Path.expand("../priv/bin/open890_ft8_decoder", __DIR__)
+      pick_default_executable.([
+        Path.join(priv_dir, "bin/open890_ft8_decoder"),
+        Path.expand("../priv/bin/open890_ft8_decoder", __DIR__)
+      ])
     )
 
   config :open890, Open890.FT8DecoderPort,
