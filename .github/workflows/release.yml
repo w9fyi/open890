@@ -151,12 +151,38 @@ jobs:
         shell: powershell
         run: |
           $releaseDir = "_build\prod\rel\open890"
+          $releaseBinScript = "$releaseDir\bin\open890.bat"
           Remove-Item -Path @(
             "$releaseDir\open890.command",
             "$releaseDir\open890-stop.command",
             "$releaseDir\open890-launcher-macos.sh",
             "$releaseDir\open890.sh"
           ) -Force -ErrorAction SilentlyContinue
+
+          if (!(Test-Path $releaseBinScript)) { throw "Missing release launcher script: $releaseBinScript" }
+
+          $lines = Get-Content -Path $releaseBinScript
+          $patched = $false
+          for ($i = 0; $i -lt $lines.Count; $i++) {
+            $line = $lines[$i].Trim().ToLower()
+            if ($line -eq 'cd "%~dp0\.."') {
+              $lines[$i] = 'cd /d "%~dp0\.."'
+              $patched = $true
+              break
+            }
+            if ($line -eq 'cd /d "%~dp0\.."') {
+              $patched = $true
+              break
+            }
+          }
+          if (-not $patched) {
+            throw "Unable to patch open890.bat drive switch line."
+          }
+          Set-Content -Path $releaseBinScript -Value $lines -Encoding ascii
+
+          if (-not (Select-String -Path $releaseBinScript -Pattern 'cd /d "%~dp0\.."' -SimpleMatch)) {
+            throw "Patch verification failed for $releaseBinScript"
+          }
 
           if (!(Test-Path "$releaseDir\open890.bat")) { throw "Missing open890.bat" }
           if (!(Test-Path "$releaseDir\open890-launcher.bat")) { throw "Missing open890-launcher.bat" }

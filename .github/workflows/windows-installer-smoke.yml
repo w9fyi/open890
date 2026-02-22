@@ -88,6 +88,12 @@ jobs:
             }
           }
 
+          $binScript = "$env:INSTALL_ROOT\bin\open890.bat"
+          $binScriptContents = Get-Content -Path $binScript -Raw
+          if ($binScriptContents -notlike '*cd /d "%~dp0\.."*') {
+            throw "Installed launcher script is missing drive switch fix (cd /d): $binScript"
+          }
+
       - name: Start open890 and wait for readiness
         shell: powershell
         run: |
