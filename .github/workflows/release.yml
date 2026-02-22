@@ -65,6 +65,9 @@ jobs:
         env:
           MIX_ENV: prod
           SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
+      - name: Include first-time setup guide in bundle
+        run: |
+          cp docs/FIRST_TIME_SETUP.md _build/prod/rel/open890/FIRST_TIME_SETUP.md
       - name: Compress files
         uses: master-atul/tar-action@v1.1.2
         with:
@@ -81,6 +84,15 @@ jobs:
           file: /tmp/open890-${{ steps.vars.outputs.TAG }}-ubuntu-x64.tar.gz
           asset_name: open890-${{ steps.vars.outputs.TAG }}-ubuntu-x64.tar.gz
           tag: ${{ steps.vars.outputs.TAG }}
+      - name: Upload first-time setup guide
+        id: upload-release-guide
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: docs/FIRST_TIME_SETUP.md
+          asset_name: open890-FIRST_TIME_SETUP.md
+          tag: ${{ steps.vars.outputs.TAG }}
+          overwrite: true
       - name: Upload Release Asset to S3 (optional)
         id: upload-release-asset-s3
         continue-on-error: true
@@ -228,6 +240,9 @@ jobs:
         env:
           MIX_ENV: prod
           SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
+      - name: Include first-time setup guide in bundle
+        run: |
+          Copy-Item -Path docs/FIRST_TIME_SETUP.md -Destination _build\prod\rel\open890\FIRST_TIME_SETUP.md -Force
       - name: Compress files
         run: |
           cd _build\prod\rel

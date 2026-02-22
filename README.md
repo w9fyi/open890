@@ -1,7 +1,7 @@
 # open890
 
-[![Latest Release](https://img.shields.io/github/v/release/tonyc/open890)](https://github.com/tonyc/open890/releases/latest)
-![Build Status](https://github.com/tonyc/open890/workflows/Build/badge.svg)
+[![Latest Release](https://img.shields.io/github/v/release/w9fyi/open890)](https://github.com/w9fyi/open890/releases/latest)
+![Build Status](https://github.com/w9fyi/open890/workflows/Build/badge.svg)
 
 open890 is a web-based UI for the Kenwood TS-890S amateur radio, and features good usability, 
 clean design, and high-speed bandscope/audio scope displays, among other features not available
@@ -43,6 +43,14 @@ If you use plain `http://` on LAN, mic permissions may show as unavailable.
 - iOS Safari may not expose per-site audio output selection; route audio at system level (Control Center/AirPlay).
 - If the wrong mic is used, reselect the input device and toggle VOIP mic off/on.
 
+## New Here? Start With This Guide
+
+If this is your first time using open890, follow:
+
+- [First-Time Setup Guide](docs/FIRST_TIME_SETUP.md)
+
+This is written for users with no prior open890 experience and includes Windows, macOS, and Linux quick-start steps.
+
 
 ## Getting Help
 
@@ -50,7 +58,7 @@ I am primarily active on the [TS-890S groups.io discussion board](https://groups
 
 ## Installation from source
 
-See [Installing From Source](https://github.com/tonyc/open890/wiki/Installing-From-Source)
+See [Installing From Source](https://github.com/w9fyi/open890/wiki/Installing-From-Source)
 
 ## Docker
 
@@ -71,8 +79,8 @@ by adjusting the `volumes` setting in `docker-compose.yml`.
 
 ### Pull & run a published image (manual)
 
-    docker pull ghcr.io/tonyc/open890:latest
-    docker run -p 4000:4000 -p 60001:60001/udp -it --rm ghcr.io/tonyc/open890:latest
+    docker pull ghcr.io/w9fyi/open890:latest
+    docker run -p 4000:4000 -p 60001:60001/udp -it --rm ghcr.io/w9fyi/open890:latest
 
 
 Port 4000 is for the main web interface, UDP port 60001 is for the UDP audio server for audio streaming.
@@ -89,7 +97,7 @@ If you would like to just build the image, you can run `make build_docker`.
 
 ## Binary releases
 
-Platform/architecture-specific binary releases are available from [releases](https://github.com/tonyc/open890/releases/latest).
+Platform/architecture-specific binary releases are available from [releases](https://github.com/w9fyi/open890/releases/latest).
 
 ### Windows
 
