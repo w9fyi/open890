@@ -107,9 +107,15 @@ This solves the open890 window closing immediately upon startup, or resolves the
 
 Then, install open890:
 
-  * Download the Windows release .zip file, and extract it somewhere useful.
-  * Navigate to where you expanded open890
-  * Double click the `open890.bat` file in the main folder.
+  * Preferred: Download the Windows installer `.exe` and run it.
+  * Alternative: Download the Windows release `.zip`, extract it, then run `open890.bat`.
+
+Installer flow:
+
+  * Run `open890-<version>-setup.exe`
+  * Accept prompts, choose install location, and allow desktop shortcut creation
+  * Launch the `open890` desktop/start-menu icon
+  * The launcher starts open890 and opens your browser to `http://localhost:4000`
 
 You will probably see several security warnings as described below. After getting through those, access the web interface at http://localhost:4000 with your 
 favorite web browser.
@@ -211,7 +217,8 @@ This does the following:
 2. Creates and pushes the release tag.
 3. Triggers GitHub Actions release workflow.
 4. Builds and publishes Windows, macOS, and Ubuntu assets in the same release.
-5. Publishes the first-time setup guide as a release asset.
+5. Publishes the Windows installer (`open890-<tag>-setup.exe`).
+6. Publishes the first-time setup guide as a release asset.
 
 Requirements:
 

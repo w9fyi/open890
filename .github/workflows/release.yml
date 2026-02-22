@@ -134,11 +134,33 @@ jobs:
           7z a ..\..\..\open890-${{ steps.vars.outputs.TAG }}-windows-x64.zip open890\
           cd ..\..\..
 
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup --no-progress -y
+
+      - name: Build Windows installer
+        shell: powershell
+        run: |
+          $tag = "${{ steps.vars.outputs.TAG }}"
+          $version = $tag -replace '^v',''
+          $sourceDir = (Resolve-Path "_build\prod\rel\open890").Path
+          $outputDir = (Get-Location).Path
+          $baseName = "open890-$tag-setup"
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc "/DMyAppVersion=$version" "/DSourceDir=$sourceDir" "/DOutputDir=$outputDir" "/F$baseName" "installers\windows\open890.iss"
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-windows
           path: open890-${{ steps.vars.outputs.TAG }}-windows-x64.zip
+          if-no-files-found: error
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-installer
+          path: open890-${{ steps.vars.outputs.TAG }}-setup.exe
           if-no-files-found: error
 
   build-macos:
@@ -222,6 +244,12 @@ jobs:
           name: release-windows
           path: dist
 
+      - name: Download Windows installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-windows-installer
+          path: dist
+
       - name: Download macOS artifact
         uses: actions/download-artifact@v4
         with:
@@ -238,5 +266,6 @@ jobs:
           files: |
             dist/open890-*.tar.gz
             dist/open890-*.zip
+            dist/open890-*.exe
             dist/open890-FIRST_TIME_SETUP.md
           generate_release_notes: true

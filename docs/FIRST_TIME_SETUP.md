@@ -29,14 +29,20 @@ If you skip this, open890 may close immediately on startup.
 1. Open releases:
    - https://github.com/w9fyi/open890/releases/latest
 2. Download:
-   - `open890-<version>-windows-x64.zip`
-3. Extract the zip to a folder you can find easily (for example `C:\open890`).
+   - `open890-<version>-setup.exe` (recommended)
+3. Run the installer and follow prompts.
+4. Keep desktop shortcut enabled when prompted.
 
 ### Step 3: Start open890
 
-1. Open the extracted folder.
-2. Double-click `open890.bat`.
-3. Leave that terminal window open while using open890.
+1. Double-click the `open890` desktop icon (or Start Menu entry).
+2. The launcher starts the service, opens your browser, and shows a status message.
+
+Zip fallback (advanced users):
+
+1. Download `open890-<version>-windows-x64.zip`.
+2. Extract it.
+3. Run `open890.bat` from the extracted folder.
 
 ### Step 4: Open the Web UI
 
