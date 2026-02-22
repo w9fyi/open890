@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-cd "$(dirname "$BASH_SOURCE")" || {
-  echo "Unable to determine script directory" >&2
-  exit 1
-}
-
-bin/open890 start
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$SCRIPT_DIR/open890-launcher-macos.sh"

@@ -76,14 +76,15 @@ Allow access on **Private networks** so local browser access works.
 2. Preferred: run `open890-<version>-macos-installer.pkg` (unsigned installer).
 3. If prompted by macOS security, allow it from Privacy & Security and continue.
 4. Start with `/Applications/open890/open890.command`.
-5. Open:
-   - http://localhost:4000
+5. open890 starts in the background, opens your browser, and shows a status dialog.
+6. To stop open890 later, run `/Applications/open890/open890-stop.command`.
 
 Archive fallback:
 
 1. Download `open890-<version>-macos.tar.gz`.
 2. Extract it.
-3. Start with `open890.command`.
+3. Start with `open890.command` in the extracted folder.
+4. Stop with `open890-stop.command` in the same folder.
 
 If macOS blocks execution, adjust your Privacy/Security settings to allow the app/script and retry.
 

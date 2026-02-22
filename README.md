@@ -173,8 +173,10 @@ After changing the security setting:
 * Preferred: Download and run the unsigned macOS installer package `open890-<version>-macos-installer.pkg`
 * Alternative: Download and unzip the macOS binary archive to somewhere useful (for example your Desktop)
 * If installed via `.pkg`, open890 is installed to `/Applications/open890`
-* Start with `/Applications/open890/open890.command` (or `open890.sh` on older systems)
-* If using the archive, double-click `open890.command`, or run it from Terminal
+* Start with `/Applications/open890/open890.command`
+* The launcher starts open890 in the background, opens your browser to `http://localhost:4000`, and shows a status dialog
+* Stop open890 with `/Applications/open890/open890-stop.command`
+* If using the archive, use `open890.command` to start and `open890-stop.command` to stop
 
 
 ### Linux (Ubuntu)
