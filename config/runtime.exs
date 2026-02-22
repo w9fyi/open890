@@ -23,6 +23,16 @@ if config_env() in [:dev, :prod] do
 
   config :open890, Open890.UDPAudioServer, port: udp_port
 
+  tx_mic_gain =
+    case Float.parse(System.get_env("OPEN890_TX_MIC_GAIN", "1.0")) do
+      {parsed, _} -> parsed
+      :error -> 1.0
+    end
+    |> max(0.01)
+    |> min(8.0)
+
+  config :open890, Open890.TCPClient, tx_mic_gain: tx_mic_gain
+
   rnnoise_enabled =
     case System.get_env("OPEN890_RNNOISE_ENABLED", "false") |> String.downcase() do
       "1" -> true
@@ -90,12 +100,13 @@ if config_env() in [:dev, :prod] do
     window_seconds: ft8_window_seconds
 
   Logger.info(
-    "Configured OPEN890_HOST: #{inspect(host)}, OPEN890_PORT: #{inspect(port)}, OPEN890_UDP_PORT: #{inspect(udp_port)}, OPEN890_RNNOISE_ENABLED: #{inspect(rnnoise_enabled)}, OPEN890_FT8_ENABLED: #{inspect(ft8_enabled)}"
+    "Configured OPEN890_HOST: #{inspect(host)}, OPEN890_PORT: #{inspect(port)}, OPEN890_UDP_PORT: #{inspect(udp_port)}, OPEN890_TX_MIC_GAIN: #{inspect(tx_mic_gain)}, OPEN890_RNNOISE_ENABLED: #{inspect(rnnoise_enabled)}, OPEN890_FT8_ENABLED: #{inspect(ft8_enabled)}"
   )
 
   config :open890, Open890.RadioConnectionRepo, database: :"db/radio_connections.dets"
 else
   config :open890, Open890.UDPAudioServer, port: 60001
+  config :open890, Open890.TCPClient, tx_mic_gain: 1.0
   config :open890, Open890.RNNoisePort, enabled: false, timeout_ms: 30
 
   config :open890, Open890.FT8DecoderPort,

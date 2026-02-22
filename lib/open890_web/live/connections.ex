@@ -54,7 +54,13 @@ defmodule Open890Web.Live.Connections do
   end
 
   def handle_event(event, %{"id" => _id, "key" => key} = params, socket)
-      when event in ["wake", "start_connection", "stop_connection", "power_off", "delete_connection"] do
+      when event in [
+             "wake",
+             "start_connection",
+             "stop_connection",
+             "power_off",
+             "delete_connection"
+           ] do
     if activation_key?(key) do
       handle_event(event, Map.delete(params, "key"), socket)
     else
@@ -62,7 +68,11 @@ defmodule Open890Web.Live.Connections do
     end
   end
 
-  def handle_event("start_connection" = event, %{"id" => id} = params, %{assigns: assigns} = socket) do
+  def handle_event(
+        "start_connection" = event,
+        %{"id" => id} = params,
+        %{assigns: assigns} = socket
+      ) do
     Logger.debug("**** ConnectionsLive: handle_event: #{event}, params: #{inspect(params)}")
 
     result = RadioConnection.start(id)
@@ -90,7 +100,11 @@ defmodule Open890Web.Live.Connections do
     {:noreply, socket}
   end
 
-  def handle_event("stop_connection" = event, %{"id" => id} = params, %{assigns: assigns} = socket) do
+  def handle_event(
+        "stop_connection" = event,
+        %{"id" => id} = params,
+        %{assigns: assigns} = socket
+      ) do
     Logger.debug("ConnectionsLive: handle_event: #{event}, params: #{inspect(params)}")
 
     conn_name = connection_name(assigns, id)
@@ -116,7 +130,11 @@ defmodule Open890Web.Live.Connections do
     {:noreply, socket}
   end
 
-  def handle_event("delete_connection" = _event, %{"id" => id} = _params, %{assigns: assigns} = socket) do
+  def handle_event(
+        "delete_connection" = _event,
+        %{"id" => id} = _params,
+        %{assigns: assigns} = socket
+      ) do
     status_message =
       case RadioConnection.find(id) do
         {:ok, connection} ->
@@ -152,9 +170,14 @@ defmodule Open890Web.Live.Connections do
       case RadioConnection.find(id) do
         {:ok, conn} ->
           case RadioConnection.power_off(conn) do
-            :ok -> socket |> put_status("#{conn_name}: power off requested.")
-            {:error, reason} -> socket |> put_status("#{conn_name}: power off failed (#{format_reason(reason)}).")
-            other -> socket |> put_status("#{conn_name}: power off result #{inspect(other)}.")
+            :ok ->
+              socket |> put_status("#{conn_name}: power off requested.")
+
+            {:error, reason} ->
+              socket |> put_status("#{conn_name}: power off failed (#{format_reason(reason)}).")
+
+            other ->
+              socket |> put_status("#{conn_name}: power off result #{inspect(other)}.")
           end
 
         _ ->
@@ -172,13 +195,51 @@ defmodule Open890Web.Live.Connections do
       case RadioConnection.find(id) do
         {:ok, conn} ->
           case RadioConnection.wake(conn) do
-            :ok -> socket |> put_status("#{conn_name}: wake requested.")
-            {:error, reason} -> socket |> put_status("#{conn_name}: wake failed (#{format_reason(reason)}).")
-            other -> socket |> put_status("#{conn_name}: wake result #{inspect(other)}.")
+            :ok ->
+              socket |> put_status("#{conn_name}: wake requested.")
+
+            {:error, reason} ->
+              socket |> put_status("#{conn_name}: wake failed (#{format_reason(reason)}).")
+
+            other ->
+              socket |> put_status("#{conn_name}: wake result #{inspect(other)}.")
           end
 
         _ ->
           Logger.warn("Could not find connection: #{inspect(id)}")
+          socket |> put_status("Connection #{id}: not found.")
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event(
+        "set_local_tx_input_trim",
+        %{"id" => id, "trim" => trim_value} = _params,
+        %{assigns: assigns} = socket
+      ) do
+    conn_name = connection_name(assigns, id)
+
+    socket =
+      case RadioConnection.find(id) do
+        {:ok, conn} ->
+          case RadioConnection.set_local_tx_input_trim(conn, trim_value) do
+            {:ok, updated_conn} ->
+              updated_connections = replace_connection(assigns.connections, updated_conn)
+              applied = updated_conn |> local_tx_input_trim() |> format_trim()
+
+              socket
+              |> assign(:connections, updated_connections)
+              |> put_status("#{conn_name}: TX Input Trim (Local) set to #{applied}.")
+
+            {:error, reason} ->
+              socket
+              |> put_status(
+                "#{conn_name}: unable to set TX Input Trim (Local) (#{format_reason(reason)})."
+              )
+          end
+
+        _ ->
           socket |> put_status("Connection #{id}: not found.")
       end
 
@@ -207,7 +268,8 @@ defmodule Open890Web.Live.Connections do
 
               {:noreply, socket}
             else
-              new_connection_states = assigns.connection_states |> Map.put(connection_id, :stopped)
+              new_connection_states =
+                assigns.connection_states |> Map.put(connection_id, :stopped)
 
               socket =
                 socket
@@ -243,7 +305,10 @@ defmodule Open890Web.Live.Connections do
   end
 
   def handle_info(
-        %Broadcast{event: "power_state", payload: %{id: connection_id, state: power_state} = _payload},
+        %Broadcast{
+          event: "power_state",
+          payload: %{id: connection_id, state: power_state} = _payload
+        },
         socket
       ) do
     new_power_states = socket.assigns.power_states |> Map.put(connection_id, power_state)
@@ -259,7 +324,10 @@ defmodule Open890Web.Live.Connections do
   end
 
   def handle_info(%Broadcast{event: event, payload: payload}, socket) do
-    Logger.debug("ConnectionsLive: unhandled broadcast event: #{event}, payload: #{inspect(payload)}")
+    Logger.debug(
+      "ConnectionsLive: unhandled broadcast event: #{event}, payload: #{inspect(payload)}"
+    )
+
     {:noreply, socket}
   end
 
@@ -302,6 +370,28 @@ defmodule Open890Web.Live.Connections do
       conn -> conn.name
     end
   end
+
+  defp replace_connection(connections, updated_connection) do
+    connections
+    |> Enum.map(fn conn ->
+      if conn.id == updated_connection.id, do: updated_connection, else: conn
+    end)
+  end
+
+  defp local_tx_input_trim(connection) do
+    connection
+    |> Map.get(:local_tx_input_trim, 1.0)
+    |> RadioConnection.normalize_local_tx_input_trim()
+  end
+
+  defp format_local_tx_input_trim(connection) do
+    connection
+    |> local_tx_input_trim()
+    |> format_trim()
+  end
+
+  defp format_trim(trim) when is_number(trim),
+    do: :erlang.float_to_binary(trim * 1.0, decimals: 2)
 
   defp format_reason(reason) when is_atom(reason), do: Atom.to_string(reason)
   defp format_reason(reason) when is_binary(reason), do: reason

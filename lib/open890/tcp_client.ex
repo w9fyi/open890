@@ -4,8 +4,6 @@ defmodule Open890.TCPClient do
   alias Open890.RTP
   alias Open890.Extract
 
-  import Bitwise, [:>>>, :&&&]
-
   @socket_opts [
     :binary,
     active: true,
@@ -43,8 +41,20 @@ defmodule Open890.TCPClient do
       |> User.password(radio_password)
       |> User.is_admin(radio_user_is_admin)
 
-
     send(self(), :connect_socket)
+
+    configured_tx_mic_gain =
+      Application.get_env(:open890, __MODULE__, [])
+      |> Keyword.get(:tx_mic_gain, 1.0)
+
+    tx_mic_gain =
+      connection
+      |> Map.get(:local_tx_input_trim)
+      |> case do
+        nil -> configured_tx_mic_gain
+        value -> value
+      end
+      |> normalize_tx_mic_gain()
 
     {:ok,
      %{
@@ -53,7 +63,8 @@ defmodule Open890.TCPClient do
        radio_state: %RadioState{},
        socket: nil,
        audio_tx_socket: nil,
-       audio_tx_seq_num: 1
+       audio_tx_seq_num: 1,
+       tx_mic_gain: tx_mic_gain
      }}
   end
 
@@ -70,50 +81,109 @@ defmodule Open890.TCPClient do
   end
 
   @impl true
-  def handle_cast({:send_audio, data}, %{connection: connection, audio_tx_socket: audio_tx_socket, audio_tx_seq_num: seq_num} = state) do
-
-    # here we have 320 values of 16-bit signed
-    # data, from -32768 to 32767
-
-    packet = make_tx_voip_packet(data, seq_num)
-
-    :gen_udp.send(audio_tx_socket, String.to_charlist(connection.ip_address), @audio_tx_socket_dst_port, packet)
-
-    # loopback test
-    # Open890Web.Endpoint.broadcast("radio:audio_stream", "audio_data", %{
-    #   payload: data
-    # })
-
-    {:noreply, %{state | audio_tx_seq_num: seq_num + 1}}
+  def handle_cast({:send_audio, data}, state) do
+    case list_to_pcm16le(data) do
+      nil -> {:noreply, state}
+      pcm16le -> {:noreply, send_mic_frame(state, pcm16le)}
+    end
   end
 
-  defp make_tx_voip_packet(data, seq_num) do
-    data
-    |> Enum.flat_map(fn sample ->
-      sample
-      |> attenuate()
-      |> signed_to_unsigned()
-      |> split_to_high_and_low_bytes()
-    end)
-    |> :binary.list_to_bin()
+  @impl true
+  def handle_cast({:send_audio_pcm16, pcm16le}, state) when is_binary(pcm16le) do
+    {:noreply, send_mic_frame(state, pcm16le)}
+  end
+
+  @impl true
+  def handle_cast({:set_tx_mic_gain, tx_mic_gain}, state) do
+    normalized = normalize_tx_mic_gain(tx_mic_gain)
+    Logger.info("Updated local TX input trim to #{normalized}")
+    {:noreply, %{state | tx_mic_gain: normalized}}
+  end
+
+  defp send_mic_frame(
+         %{connection: %{ip_address: ip_address}, audio_tx_socket: audio_tx_socket} = state,
+         pcm16le
+       )
+       when is_binary(ip_address) and ip_address != "" and is_port(audio_tx_socket) and
+              is_binary(pcm16le) do
+    frame = normalize_pcm16le_frame(pcm16le)
+    packet = make_tx_voip_packet(frame, state.audio_tx_seq_num, state.tx_mic_gain)
+
+    case :gen_udp.send(
+           audio_tx_socket,
+           String.to_charlist(ip_address),
+           @audio_tx_socket_dst_port,
+           packet
+         ) do
+      :ok ->
+        %{state | audio_tx_seq_num: state.audio_tx_seq_num + 1}
+
+      {:error, reason} ->
+        Logger.warn("Unable to send mic frame: #{inspect(reason)}")
+        state
+    end
+  end
+
+  defp send_mic_frame(state, _pcm16le), do: state
+
+  defp make_tx_voip_packet(frame_pcm16le, seq_num, tx_mic_gain) do
+    frame_pcm16le
+    |> encode_tx_payload(tx_mic_gain)
     |> RTP.make_packet(seq_num)
   end
 
-  defp attenuate(sample) do
-    trunc(sample * sample_scale_factor())
+  defp encode_tx_payload(frame_pcm16le, tx_mic_gain) do
+    for <<sample::signed-little-16 <- frame_pcm16le>>, into: <<>> do
+      scaled = scale_sample(sample, tx_mic_gain)
+      unsigned = scaled + 32_768
+      <<unsigned::unsigned-big-16>>
+    end
   end
 
-  defp sample_scale_factor do
-    0.01
+  defp list_to_pcm16le(data) when is_list(data) do
+    data
+    |> Enum.take(320)
+    |> Enum.reduce(<<>>, fn sample, acc ->
+      <<acc::binary, clamp_sample(sample)::signed-little-16>>
+    end)
+    |> normalize_pcm16le_frame()
   end
 
-  defp signed_to_unsigned(val) do
-    val + 32768
+  defp list_to_pcm16le(_), do: nil
+
+  defp normalize_pcm16le_frame(frame_pcm16le) when byte_size(frame_pcm16le) == 640,
+    do: frame_pcm16le
+
+  defp normalize_pcm16le_frame(frame_pcm16le) when byte_size(frame_pcm16le) > 640,
+    do: binary_part(frame_pcm16le, 0, 640)
+
+  defp normalize_pcm16le_frame(frame_pcm16le) do
+    missing = 640 - byte_size(frame_pcm16le)
+    <<frame_pcm16le::binary, 0::size(missing)-unit(8)>>
   end
 
-  defp split_to_high_and_low_bytes(val) do
-    [val >>> 8, val &&& 0xff]
+  defp scale_sample(sample, tx_mic_gain) do
+    sample
+    |> Kernel.*(tx_mic_gain)
+    |> round()
+    |> clamp_sample()
   end
+
+  defp clamp_sample(sample) when is_integer(sample), do: min(32_767, max(-32_768, sample))
+  defp clamp_sample(sample) when is_float(sample), do: sample |> round() |> clamp_sample()
+  defp clamp_sample(_sample), do: 0
+
+  defp normalize_tx_mic_gain(gain) when is_float(gain), do: min(8.0, max(0.01, gain))
+  defp normalize_tx_mic_gain(gain) when is_integer(gain), do: normalize_tx_mic_gain(gain * 1.0)
+
+  defp normalize_tx_mic_gain(gain) when is_binary(gain) do
+    case Float.parse(gain) do
+      {parsed, _} -> normalize_tx_mic_gain(parsed)
+      :error -> 1.0
+    end
+  end
+
+  defp normalize_tx_mic_gain(_), do: 1.0
 
   def handle_info({:tcp, _socket, _msg}, {:noreply, %{connection: connection} = state}) do
     Logger.error("Got TCP :noreply state")
@@ -146,7 +216,10 @@ defmodule Open890.TCPClient do
             {:cont, new_state}
 
           other ->
-            Logger.error("Unexpected handle_msg return for #{inspect(single_message)}: #{inspect(other)}")
+            Logger.error(
+              "Unexpected handle_msg return for #{inspect(single_message)}: #{inspect(other)}"
+            )
+
             {:cont, acc}
         end
       end)
@@ -190,7 +263,7 @@ defmodule Open890.TCPClient do
           {:noreply, %{state | audio_tx_socket: audio_tx_socket}}
         else
           other ->
-            Logger.warn("Error opening audio TX UDP socket: #{inspect other}")
+            Logger.warn("Error opening audio TX UDP socket: #{inspect(other)}")
             {:noreply, state}
         end
 
@@ -299,6 +372,7 @@ defmodule Open890.TCPClient do
 
     state
   end
+
   def handle_msg("##ID0", %{connection: connection, socket: socket} = state) do
     Logger.warn("Error connecting to radio: Incorrect username or password")
     broadcast_connection_state(connection, {:down, :bad_credentials})
@@ -325,7 +399,6 @@ defmodule Open890.TCPClient do
 
   # # filter scope LAN/high cycle respnose
   # def handle_msg("DD11", state), do: state
-
 
   def handle_msg("BSD", %{connection: connection} = state) do
     RadioConnection.broadcast_band_scope_cleared(connection)

@@ -10,6 +10,7 @@ defmodule Open890.RadioConnection do
             name: nil,
             ip_address: nil,
             tcp_port: @default_tcp_port,
+            local_tx_input_trim: 1.0,
             mac_address: nil,
             user_name: nil,
             password: nil,
@@ -38,7 +39,7 @@ defmodule Open890.RadioConnection do
         :ok
 
       str when is_binary(str) ->
-        Logger.info("Sending WOL packet to #{inspect str}")
+        Logger.info("Sending WOL packet to #{inspect(str)}")
         WOL.send(str)
     end
   end
@@ -253,6 +254,7 @@ defmodule Open890.RadioConnection do
 
   def send_mic_audio(%__MODULE__{} = connection, data) do
     Logger.info("RadioConnection.send_mic_audio")
+
     connection
     |> get_connection_pid()
     |> case do
@@ -260,9 +262,57 @@ defmodule Open890.RadioConnection do
         pid |> GenServer.cast({:send_audio, data})
 
       _ ->
-        Logger.warn("Unable to send mic audio to #{connection.id} - pid not found. Is the connection up?")
+        Logger.warn(
+          "Unable to send mic audio to #{connection.id} - pid not found. Is the connection up?"
+        )
     end
   end
+
+  def send_mic_audio_frame(%__MODULE__{} = connection, pcm16le) when is_binary(pcm16le) do
+    connection
+    |> get_connection_pid()
+    |> case do
+      {:ok, pid} ->
+        pid |> GenServer.cast({:send_audio_pcm16, pcm16le})
+
+      _ ->
+        Logger.warn(
+          "Unable to send mic audio frame to #{connection.id} - pid not found. Is the connection up?"
+        )
+    end
+  end
+
+  def set_local_tx_input_trim(%__MODULE__{} = connection, value) do
+    local_tx_input_trim = normalize_local_tx_input_trim(value)
+    updated_connection = Map.put(connection, :local_tx_input_trim, local_tx_input_trim)
+
+    case repo().update(updated_connection) do
+      :ok ->
+        maybe_apply_local_tx_input_trim(updated_connection, local_tx_input_trim)
+        {:ok, updated_connection}
+
+      other ->
+        Logger.warn(
+          "Unable to update local TX input trim for #{connection.id}: #{inspect(other)}"
+        )
+
+        {:error, other}
+    end
+  end
+
+  def normalize_local_tx_input_trim(value) when is_float(value), do: min(8.0, max(0.01, value))
+
+  def normalize_local_tx_input_trim(value) when is_integer(value),
+    do: normalize_local_tx_input_trim(value * 1.0)
+
+  def normalize_local_tx_input_trim(value) when is_binary(value) do
+    case Float.parse(value) do
+      {parsed, _} -> normalize_local_tx_input_trim(parsed)
+      :error -> 1.0
+    end
+  end
+
+  def normalize_local_tx_input_trim(_), do: 1.0
 
   def query_power_state(connection) do
     connection |> cmd("PS")
@@ -360,6 +410,18 @@ defmodule Open890.RadioConnection do
     |> case do
       [{pid, _}] -> {:ok, pid}
       [] -> {:error, :not_found}
+    end
+  end
+
+  defp maybe_apply_local_tx_input_trim(%__MODULE__{} = connection, local_tx_input_trim) do
+    connection
+    |> get_connection_pid()
+    |> case do
+      {:ok, pid} ->
+        pid |> GenServer.cast({:set_tx_mic_gain, local_tx_input_trim})
+
+      _ ->
+        :ok
     end
   end
 

@@ -197,6 +197,10 @@ If you would like to change the default host and port that open890 is accessed v
 
 You can change default UDP audio server port from 60001 to whatever you'd like by setting `OPEN890_UDP_PORT`. This is useful if your ISP filters port 60001 and would like to forward the port yourself.
 
+You can adjust transmit microphone level scaling with **TX Input Trim (Local)** in the **Connections** page for each saved connection. This is applied in open890 before audio is sent to the radio and is not a CAT/radio setting.
+
+You can also set a process-wide default with `OPEN890_TX_MIC_GAIN` (default `1.0`, valid range `0.01` to `8.0`). Per-connection UI values override this default.
+
 Please note that the web interface **is not secured with a password**, and it assumes that you will run it on a trusted network. This is equivalent to running a computer with ARCP-890 left running.
 
 If you wish to require a basic password, edit `config/config.toml` (you may need to copy `example.config.toml` first), and uncomment or add the following section:

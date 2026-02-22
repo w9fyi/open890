@@ -104,12 +104,52 @@ let Hooks = {
       let me = this;
       this.micEnabled = false
 
+      this.frameToBase64PCM16LE = (inputFrame) => {
+        let samples
+        if (inputFrame instanceof Int16Array) {
+          samples = inputFrame
+        } else if (Array.isArray(inputFrame)) {
+          samples = Int16Array.from(inputFrame.map((v) => {
+            const n = Number(v) || 0
+            if (n > 32767) return 32767
+            if (n < -32768) return -32768
+            return Math.round(n)
+          }))
+        } else if (inputFrame && inputFrame.buffer && typeof inputFrame.length === "number") {
+          samples = Int16Array.from(inputFrame)
+        } else {
+          throw new Error("Unsupported microphone frame type")
+        }
+
+        const bytes = new Uint8Array(samples.length * 2)
+        for (let i = 0; i < samples.length; i += 1) {
+          const sample = samples[i]
+          bytes[i * 2] = sample & 0xff
+          bytes[i * 2 + 1] = (sample >> 8) & 0xff
+        }
+
+        let binary = ""
+        const chunkSize = 0x8000
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          const chunk = bytes.subarray(i, i + chunkSize)
+          binary += String.fromCharCode.apply(null, chunk)
+        }
+        return window.btoa(binary)
+      }
+
       this.engine = {
         onmessage: function(e) {
           switch (e.data.command) {
             case 'process':
-              const inputData = e.data.inputFrame;
-              me.pushEvent("mic_audio", {data: inputData.join(" ")})
+              try {
+                const inputData = e.data.inputFrame
+                const payload = me.frameToBase64PCM16LE(inputData)
+                me.pushEvent("mic_audio_frame", {pcm16le_b64: payload})
+              } catch (err) {
+                console.error("Failed to encode mic frame to base64, falling back", err)
+                const inputData = e.data.inputFrame
+                me.pushEvent("mic_audio", {data: inputData.join(" ")})
+              }
               break;
           }
         }

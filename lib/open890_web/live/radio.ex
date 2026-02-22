@@ -694,6 +694,20 @@ defmodule Open890Web.Live.Radio do
     {:noreply, socket}
   end
 
+  def handle_event("mic_audio_frame", %{"pcm16le_b64" => payload_b64}, socket)
+      when is_binary(payload_b64) do
+    case Base.decode64(payload_b64) do
+      {:ok, pcm16le} when is_binary(pcm16le) ->
+        socket.assigns.radio_connection
+        |> RadioConnection.send_mic_audio_frame(pcm16le)
+
+      :error ->
+        Logger.warn("Invalid mic_audio_frame payload (base64 decode failed)")
+    end
+
+    {:noreply, socket}
+  end
+
   def handle_event(event, params, socket) do
     Logger.warn("Live.Radio: Unknown event: #{event}, params: #{inspect(params)}")
     {:noreply, socket}

@@ -42,6 +42,35 @@
                 <td>
                   <h2><%= connection.name %></h2>
                   <span><%= connection_to_uri(connection) %></span>
+                  <div class="ui hidden divider"></div>
+
+                  <form phx-submit="set_local_tx_input_trim" class="ui mini form">
+                    <input type="hidden" name="id" value={connection.id} />
+
+                    <div class="field">
+                      <label for={"local-tx-trim-#{connection.id}"}>
+                        TX Input Trim (Local)
+                      </label>
+                      <div class="ui right action input">
+                        <input
+                          id={"local-tx-trim-#{connection.id}"}
+                          type="number"
+                          name="trim"
+                          min="0.01"
+                          max="8.0"
+                          step="0.05"
+                          value={format_local_tx_input_trim(connection)}
+                          aria-label={"TX Input Trim (Local) for #{connection.name}"}
+                        />
+                        <button type="submit" class="ui tiny button">
+                          Apply
+                        </button>
+                      </div>
+                      <small>
+                        Mic -> open890 local trim -> radio. Not a radio CAT setting.
+                      </small>
+                    </div>
+                  </form>
                 </td>
 
                 <td class="center aligned">
