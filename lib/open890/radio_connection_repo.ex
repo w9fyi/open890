@@ -37,14 +37,17 @@ defmodule Open890.RadioConnectionRepo do
   def init do
     Logger.debug("RadioConnectionRepo.init()")
 
-    if !File.exists?("db/") do
-      Logger.debug("db/ directory doesn't exist, creating")
-      File.mkdir!("db")
+    db_file = database_file()
+    db_dir = Path.dirname(db_file)
+
+    if !File.exists?(db_dir) do
+      Logger.debug("Database directory doesn't exist, creating: #{db_dir}")
+      File.mkdir_p!(db_dir)
     else
-      Logger.debug("db/ exists, skipping")
+      Logger.debug("Database directory exists, skipping: #{db_dir}")
     end
 
-    {:ok, table} = :dets.open_file(table_name(), type: :set)
+    {:ok, table} = :dets.open_file(table_name(), type: :set, file: String.to_charlist(db_file))
     {:ok, table}
   end
 
@@ -58,7 +61,7 @@ defmodule Open890.RadioConnectionRepo do
 
     if forced do
       Logger.warn("Forcefully destroying database: #{table_name()}")
-      :ok = File.rm!(table_name() |> to_string())
+      :ok = File.rm!(database_file())
     else
       Logger.info(
         "destroy_repo!: force: true was not passed, not destroying table #{table_name()}"
@@ -135,7 +138,21 @@ defmodule Open890.RadioConnectionRepo do
 
   defp table_name do
     :open890
-    |> Application.get_env(Open890.RadioConnectionRepo)
-    |> Keyword.fetch!(:database)
+    |> Application.get_env(Open890.RadioConnectionRepo, [])
+    |> Keyword.get(:database, :open890)
+  end
+
+  defp database_file do
+    config = Application.get_env(:open890, Open890.RadioConnectionRepo, [])
+
+    case config |> Keyword.get(:database_file) do
+      path when is_binary(path) and path != "" ->
+        path
+
+      _ ->
+        config
+        |> Keyword.fetch!(:database)
+        |> to_string()
+    end
   end
 end

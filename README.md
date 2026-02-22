@@ -251,6 +251,8 @@ You can adjust transmit microphone level scaling with **TX Input Trim (Local)** 
 
 You can also set a process-wide default with `OPEN890_TX_MIC_GAIN` (default `1.0`, valid range `0.01` to `8.0`). Per-connection UI values override this default.
 
+You can override where open890 stores its connection database by setting `OPEN890_DB_PATH` to a writable file path (or `OPEN890_DB_DIR` to a writable directory).
+
 Please note that the web interface **is not secured with a password**, and it assumes that you will run it on a trusted network. This is equivalent to running a computer with ARCP-890 left running.
 
 If you wish to require a basic password, edit `config/config.toml` (you may need to copy `example.config.toml` first), and uncomment or add the following section:

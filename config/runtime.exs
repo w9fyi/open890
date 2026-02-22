@@ -121,7 +121,37 @@ if config_env() in [:dev, :prod] do
     "Configured OPEN890_HOST: #{inspect(host)}, OPEN890_PORT: #{inspect(port)}, OPEN890_UDP_PORT: #{inspect(udp_port)}, OPEN890_TX_MIC_GAIN: #{inspect(tx_mic_gain)}, OPEN890_RNNOISE_ENABLED: #{inspect(rnnoise_enabled)}, OPEN890_FT8_ENABLED: #{inspect(ft8_enabled)}"
   )
 
-  config :open890, Open890.RadioConnectionRepo, database: :"db/radio_connections.dets"
+  release_db_default =
+    if System.get_env("RELEASE_NAME") not in [nil, ""] do
+      home_dir = System.user_home() || System.get_env("HOME") || "."
+
+      Path.join([
+        home_dir,
+        "Library",
+        "Application Support",
+        "open890",
+        "db",
+        "radio_connections.dets"
+      ])
+    else
+      "db/radio_connections.dets"
+    end
+
+  radio_connections_db_path =
+    case {System.get_env("OPEN890_DB_PATH"), System.get_env("OPEN890_DB_DIR")} do
+      {path, _} when is_binary(path) and path != "" ->
+        path
+
+      {_, dir} when is_binary(dir) and dir != "" ->
+        Path.join(dir, "radio_connections.dets")
+
+      _ ->
+        release_db_default
+    end
+
+  config :open890, Open890.RadioConnectionRepo,
+    database: :open890,
+    database_file: radio_connections_db_path
 else
   config :open890, Open890.UDPAudioServer, port: 60001
   config :open890, Open890.TCPClient, tx_mic_gain: 1.0
@@ -133,5 +163,7 @@ else
     sample_rate_hz: 16_000,
     window_seconds: 15
 
-  config :open890, Open890.RadioConnectionRepo, database: :"db/radio_connections_test.dets"
+  config :open890, Open890.RadioConnectionRepo,
+    database: :open890_test,
+    database_file: "db/radio_connections_test.dets"
 end
