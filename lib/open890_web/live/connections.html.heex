@@ -40,7 +40,15 @@
             <%= for connection <- @connections do %>
               <tr>
                 <td>
-                  <h2><%= connection.name %></h2>
+                  <h2>
+                    <.link
+                      id={"connection-name-link-#{connection.id}"}
+                      href={~p"/connections/#{connection.id}/edit"}
+                      aria-label={"Edit connection #{connection.name}"}
+                    >
+                      <%= connection.name %>
+                    </.link>
+                  </h2>
                   <span><%= connection_to_uri(connection) %></span>
                   <div class="ui hidden divider"></div>
 
