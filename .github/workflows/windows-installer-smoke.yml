@@ -151,6 +151,8 @@ jobs:
 
             $startProc.Refresh()
             if ($startProc.HasExited) {
+              $startProc.WaitForExit()
+              $startProc.Refresh()
               $startExitCode = $startProc.ExitCode
               Add-Content -Path $probeLog -Value ("{0}`tstart_process_exited={1}" -f (Get-Date -Format o), $startExitCode)
               if ($startExitCode -ne 0) {
@@ -166,6 +168,8 @@ jobs:
 
           $startProc.Refresh()
           if ($startProc.HasExited -and $startExitCode -eq $null) {
+            $startProc.WaitForExit()
+            $startProc.Refresh()
             $startExitCode = $startProc.ExitCode
           }
 
@@ -187,8 +191,14 @@ jobs:
           $stopScript = "$env:INSTALL_ROOT\bin\open890.bat"
           $stopStdoutLog = Join-Path $env:RUNNER_TEMP "open890-stop-stdout.log"
           $stopStderrLog = Join-Path $env:RUNNER_TEMP "open890-stop-stderr.log"
+          $stopMetaLog = Join-Path $env:RUNNER_TEMP "open890-stop-meta.txt"
           "OPEN890_STOP_STDOUT_LOG=$stopStdoutLog" >> $env:GITHUB_ENV
           "OPEN890_STOP_STDERR_LOG=$stopStderrLog" >> $env:GITHUB_ENV
+          "OPEN890_STOP_META_LOG=$stopMetaLog" >> $env:GITHUB_ENV
+
+          if (Test-Path $stopMetaLog) {
+            Remove-Item -Path $stopMetaLog -Force -ErrorAction SilentlyContinue
+          }
 
           if (Test-Path $stopScript) {
             $stopProc = Start-Process `
@@ -200,9 +210,12 @@ jobs:
               -RedirectStandardOutput $stopStdoutLog `
               -RedirectStandardError $stopStderrLog
 
+            Add-Content -Path $stopMetaLog -Value ("stop_exit_code={0}" -f $stopProc.ExitCode)
             if ($stopProc.ExitCode -ne 0) {
               Add-Content -Path $stopStderrLog -Value ("stop_exit_code={0}" -f $stopProc.ExitCode)
             }
+          } else {
+            Add-Content -Path $stopMetaLog -Value ("stop_script_missing={0}" -f $stopScript)
           }
 
       - name: Collect diagnostics
@@ -243,6 +256,25 @@ jobs:
 
           if ($env:OPEN890_STOP_STDERR_LOG -and (Test-Path $env:OPEN890_STOP_STDERR_LOG)) {
             Copy-Item -Path $env:OPEN890_STOP_STDERR_LOG -Destination (Join-Path $diagDir "open890-stop-stderr.log") -Force
+          }
+
+          if ($env:OPEN890_STOP_META_LOG -and (Test-Path $env:OPEN890_STOP_META_LOG)) {
+            Copy-Item -Path $env:OPEN890_STOP_META_LOG -Destination (Join-Path $diagDir "open890-stop-meta.txt") -Force
+          }
+
+          if (Test-Path $env:INSTALL_ROOT) {
+            $scriptFiles = @{
+              "installed-open890-launcher.bat" = (Join-Path $env:INSTALL_ROOT "open890-launcher.bat")
+              "installed-open890-launcher.ps1" = (Join-Path $env:INSTALL_ROOT "open890-launcher.ps1")
+              "installed-bin-open890.bat" = (Join-Path $env:INSTALL_ROOT "bin\open890.bat")
+            }
+
+            foreach ($destName in $scriptFiles.Keys) {
+              $sourcePath = $scriptFiles[$destName]
+              if (Test-Path $sourcePath) {
+                Copy-Item -Path $sourcePath -Destination (Join-Path $diagDir $destName) -Force
+              }
+            }
           }
 
           $launcherDirListing = Join-Path $diagDir "install-dir-listing.txt"
