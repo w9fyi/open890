@@ -213,39 +213,6 @@ defmodule Open890Web.Live.Connections do
     {:noreply, socket}
   end
 
-  def handle_event(
-        "set_local_tx_input_trim",
-        %{"id" => id, "trim" => trim_value} = _params,
-        %{assigns: assigns} = socket
-      ) do
-    conn_name = connection_name(assigns, id)
-
-    socket =
-      case RadioConnection.find(id) do
-        {:ok, conn} ->
-          case RadioConnection.set_local_tx_input_trim(conn, trim_value) do
-            {:ok, updated_conn} ->
-              updated_connections = replace_connection(assigns.connections, updated_conn)
-              applied = updated_conn |> local_tx_input_trim() |> format_trim()
-
-              socket
-              |> assign(:connections, updated_connections)
-              |> put_status("#{conn_name}: TX Input Trim (Local) set to #{applied}.")
-
-            {:error, reason} ->
-              socket
-              |> put_status(
-                "#{conn_name}: unable to set TX Input Trim (Local) (#{format_reason(reason)})."
-              )
-          end
-
-        _ ->
-          socket |> put_status("Connection #{id}: not found.")
-      end
-
-    {:noreply, socket}
-  end
-
   def handle_event(event, params, %{assigns: _assigns} = socket) do
     Logger.debug("ConnectionsLive: default handle_event: #{event}, params: #{inspect(params)}")
     {:noreply, socket}
@@ -377,21 +344,6 @@ defmodule Open890Web.Live.Connections do
       if conn.id == updated_connection.id, do: updated_connection, else: conn
     end)
   end
-
-  defp local_tx_input_trim(connection) do
-    connection
-    |> Map.get(:local_tx_input_trim, 1.0)
-    |> RadioConnection.normalize_local_tx_input_trim()
-  end
-
-  defp format_local_tx_input_trim(connection) do
-    connection
-    |> local_tx_input_trim()
-    |> format_trim()
-  end
-
-  defp format_trim(trim) when is_number(trim),
-    do: :erlang.float_to_binary(trim * 1.0, decimals: 2)
 
   defp format_reason(reason) when is_atom(reason), do: Atom.to_string(reason)
   defp format_reason(reason) when is_binary(reason), do: reason

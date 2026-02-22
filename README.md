@@ -243,7 +243,7 @@ If you would like to change the default host and port that open890 is accessed v
 
 You can change default UDP audio server port from 60001 to whatever you'd like by setting `OPEN890_UDP_PORT`. This is useful if your ISP filters port 60001 and would like to forward the port yourself.
 
-You can adjust transmit microphone level scaling with **TX Input Trim (Local)** in the **Connections** page for each saved connection. This is applied in open890 before audio is sent to the radio and is not a CAT/radio setting.
+You can adjust transmit microphone level scaling with **TX Input Trim (Local)** in the **RX-ANT** tab on the Radio front panel. This slider is saved per connection and is applied in open890 before audio is sent to the radio (not a CAT/radio setting).
 
 You can also set a process-wide default with `OPEN890_TX_MIC_GAIN` (default `1.0`, valid range `0.01` to `8.0`). Per-connection UI values override this default.
 

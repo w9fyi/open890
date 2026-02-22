@@ -619,6 +619,24 @@
                 />
               </div>
             </div>
+            <div class="ui one column grid row">
+              <div class="center aligned column">
+                TX Input Trim (Local): <%= format_local_tx_input_trim(@radio_connection) %>x
+                <Slider.slider
+                  id="local-tx-input-trim-slider"
+                  label=""
+                  aria_label="TX Input Trim Local (0.01x to 8.00x)"
+                  min_value={1}
+                  value={local_tx_input_trim_slider_value(@radio_connection)}
+                  max_value={800}
+                  step={1}
+                  click="local_tx_input_trim_changed"
+                />
+                <small id="local-tx-input-trim-help">
+                  Mic -> open890 local trim -> radio. Per-connection setting, not a radio CAT value.
+                </small>
+              </div>
+            </div>
           </div>
 
           <div

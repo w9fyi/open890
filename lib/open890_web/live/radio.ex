@@ -682,6 +682,25 @@ defmodule Open890Web.Live.Radio do
     {:noreply, socket}
   end
 
+  def handle_event("local_tx_input_trim_changed", %{"value" => slider_value}, socket) do
+    trim = local_tx_input_trim_from_slider(slider_value)
+
+    case socket.assigns.radio_connection do
+      %RadioConnection{} = connection ->
+        case RadioConnection.set_local_tx_input_trim(connection, trim) do
+          {:ok, updated_conn} ->
+            {:noreply, assign(socket, :radio_connection, updated_conn)}
+
+          {:error, reason} ->
+            Logger.warn("Unable to set local TX input trim from slider: #{inspect(reason)}")
+            {:noreply, socket}
+        end
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
   def handle_event("mic_audio", params, socket) do
     mic_data =
       params["data"]
@@ -822,6 +841,51 @@ defmodule Open890Web.Live.Radio do
     else
       "ui tabs hidden"
     end
+  end
+
+  defp local_tx_input_trim_slider_value(nil), do: 100
+
+  defp local_tx_input_trim_slider_value(connection) do
+    connection
+    |> Map.get(:local_tx_input_trim, 1.0)
+    |> RadioConnection.normalize_local_tx_input_trim()
+    |> Kernel.*(100)
+    |> round()
+    |> max(1)
+    |> min(800)
+  end
+
+  defp local_tx_input_trim_from_slider(value) do
+    scaled =
+      case value do
+        v when is_integer(v) ->
+          v
+
+        v when is_float(v) ->
+          round(v)
+
+        v when is_binary(v) ->
+          case Integer.parse(v) do
+            {parsed, _rest} -> parsed
+            :error -> 100
+          end
+
+        _ ->
+          100
+      end
+      |> max(1)
+      |> min(800)
+
+    scaled / 100.0
+  end
+
+  defp format_local_tx_input_trim(nil), do: "1.00"
+
+  defp format_local_tx_input_trim(connection) do
+    connection
+    |> Map.get(:local_tx_input_trim, 1.0)
+    |> RadioConnection.normalize_local_tx_input_trim()
+    |> :erlang.float_to_binary(decimals: 2)
   end
 
   defp mode_shortcut_cmd("l"), do: "MD1"
