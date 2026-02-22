@@ -114,8 +114,10 @@ Installer flow:
 
   * Run `open890-<version>-setup.exe`
   * Accept prompts, choose install location, and allow desktop shortcut creation
+  * Optional: enable the troubleshooting checkbox to auto-collect diagnostics and open a pre-filled GitHub issue draft if startup fails
   * Launch the `open890` desktop/start-menu icon
   * The launcher starts open890 and opens your browser to `http://localhost:4000`
+  * If startup fails with troubleshooting enabled, a diagnostics zip is created on your Desktop and a pre-filled GitHub issue draft opens automatically
 
 You will probably see several security warnings as described below. After getting through those, access the web interface at http://localhost:4000 with your 
 favorite web browser.

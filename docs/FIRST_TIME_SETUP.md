@@ -32,11 +32,13 @@ If you skip this, open890 may close immediately on startup.
    - `open890-<version>-setup.exe` (recommended)
 3. Run the installer and follow prompts.
 4. Keep desktop shortcut enabled when prompted.
+5. Optional: enable the troubleshooting checkbox to auto-collect logs and open a pre-filled GitHub issue draft if startup fails.
 
 ### Step 3: Start open890
 
 1. Double-click the `open890` desktop icon (or Start Menu entry).
 2. The launcher starts the service, opens your browser, and shows a status message.
+3. If startup fails and you enabled the troubleshooting checkbox in the installer, open890 creates a diagnostics zip on your Desktop and opens a pre-filled GitHub issue draft.
 
 Zip fallback (advanced users):
 
