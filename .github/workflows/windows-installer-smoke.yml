@@ -93,35 +93,90 @@ jobs:
         run: |
           $appUrl = "${{ inputs.app_url }}"
           $timeoutSeconds = [int]"${{ inputs.timeout_seconds }}"
+          $startScript = Join-Path $env:INSTALL_ROOT "bin\open890.bat"
           $serverLog = Join-Path $env:TEMP "open890-server.log"
-          $startLog = Join-Path $env:RUNNER_TEMP "open890-start.log"
+          $startStdoutLog = Join-Path $env:RUNNER_TEMP "open890-start-stdout.log"
+          $startStderrLog = Join-Path $env:RUNNER_TEMP "open890-start-stderr.log"
+          $probeLog = Join-Path $env:RUNNER_TEMP "open890-readiness-probe.log"
+          $startMetaLog = Join-Path $env:RUNNER_TEMP "open890-start-meta.txt"
           $ready = $false
+          $startExitCode = $null
 
-          if (Test-Path $serverLog) {
-            Remove-Item -Path $serverLog -Force
+          foreach ($path in @($serverLog, $startStdoutLog, $startStderrLog, $probeLog, $startMetaLog)) {
+            if (Test-Path $path) {
+              Remove-Item -Path $path -Force -ErrorAction SilentlyContinue
+            }
           }
 
-          $startCommand = "`"$env:INSTALL_ROOT\bin\open890.bat`" start > `"$startLog`" 2>&1"
-          Start-Process -FilePath "cmd.exe" -ArgumentList "/c $startCommand" -WindowStyle Hidden
+          "OPEN890_SERVER_LOG=$serverLog" >> $env:GITHUB_ENV
+          "OPEN890_START_STDOUT_LOG=$startStdoutLog" >> $env:GITHUB_ENV
+          "OPEN890_START_STDERR_LOG=$startStderrLog" >> $env:GITHUB_ENV
+          "OPEN890_PROBE_LOG=$probeLog" >> $env:GITHUB_ENV
+          "OPEN890_START_META_LOG=$startMetaLog" >> $env:GITHUB_ENV
+
+          if (!(Test-Path $startScript)) {
+            throw "Start script was not found: $startScript"
+          }
+
+          $startProc = Start-Process `
+            -FilePath $env:ComSpec `
+            -ArgumentList @("/d", "/c", "`"$startScript`" start") `
+            -WindowStyle Hidden `
+            -PassThru `
+            -RedirectStandardOutput $startStdoutLog `
+            -RedirectStandardError $startStderrLog
+
+          @(
+            "start_pid=$($startProc.Id)",
+            "start_script=$startScript",
+            "app_url=$appUrl",
+            "timeout_seconds=$timeoutSeconds"
+          ) | Out-File -FilePath $startMetaLog -Encoding UTF8
+
+          Add-Content -Path $probeLog -Value ("{0}`tstart_spawned_pid={1}" -f (Get-Date -Format o), $startProc.Id)
 
           for ($i = 0; $i -lt $timeoutSeconds; $i++) {
+            $probeResult = "not_ready"
             try {
               $response = Invoke-WebRequest -UseBasicParsing -Uri $appUrl -TimeoutSec 2
               if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) {
                 $ready = $true
-                break
+                $probeResult = "ready_status=$($response.StatusCode)"
               }
             } catch {
-              # keep waiting
+              $probeResult = "request_error=$($_.Exception.Message)"
             }
 
+            Add-Content -Path $probeLog -Value ("{0}`tattempt={1}`t{2}" -f (Get-Date -Format o), ($i + 1), $probeResult)
+
+            $startProc.Refresh()
+            if ($startProc.HasExited) {
+              $startExitCode = $startProc.ExitCode
+              Add-Content -Path $probeLog -Value ("{0}`tstart_process_exited={1}" -f (Get-Date -Format o), $startExitCode)
+              if ($startExitCode -ne 0) {
+                break
+              }
+            }
+
+            if ($ready) {
+              break
+            }
             Start-Sleep -Seconds 1
           }
 
-          "OPEN890_SERVER_LOG=$serverLog" >> $env:GITHUB_ENV
-          "OPEN890_START_LOG=$startLog" >> $env:GITHUB_ENV
+          $startProc.Refresh()
+          if ($startProc.HasExited -and $startExitCode -eq $null) {
+            $startExitCode = $startProc.ExitCode
+          }
+
+          Add-Content -Path $startMetaLog -Value ("start_process_final_state={0}" -f ($(if ($startProc.HasExited) { "exited" } else { "running" })))
+          Add-Content -Path $startMetaLog -Value ("start_process_exit_code={0}" -f ($(if ($startExitCode -ne $null) { $startExitCode } else { "n/a" })))
+          Add-Content -Path $startMetaLog -Value ("ready={0}" -f $ready)
 
           if (-not $ready) {
+            if ($startExitCode -ne $null -and $startExitCode -ne 0) {
+              throw "open890 start command exited with code $startExitCode before readiness check succeeded."
+            }
             throw "open890 did not become ready at $appUrl within $timeoutSeconds seconds."
           }
 
@@ -130,8 +185,24 @@ jobs:
         shell: powershell
         run: |
           $stopScript = "$env:INSTALL_ROOT\bin\open890.bat"
+          $stopStdoutLog = Join-Path $env:RUNNER_TEMP "open890-stop-stdout.log"
+          $stopStderrLog = Join-Path $env:RUNNER_TEMP "open890-stop-stderr.log"
+          "OPEN890_STOP_STDOUT_LOG=$stopStdoutLog" >> $env:GITHUB_ENV
+          "OPEN890_STOP_STDERR_LOG=$stopStderrLog" >> $env:GITHUB_ENV
+
           if (Test-Path $stopScript) {
-            cmd.exe /c "`"$stopScript`" stop" 2>&1 | Out-Null
+            $stopProc = Start-Process `
+              -FilePath $env:ComSpec `
+              -ArgumentList @("/d", "/c", "`"$stopScript`" stop") `
+              -WindowStyle Hidden `
+              -PassThru `
+              -Wait `
+              -RedirectStandardOutput $stopStdoutLog `
+              -RedirectStandardError $stopStderrLog
+
+            if ($stopProc.ExitCode -ne 0) {
+              Add-Content -Path $stopStderrLog -Value ("stop_exit_code={0}" -f $stopProc.ExitCode)
+            }
           }
 
       - name: Collect diagnostics
@@ -146,12 +217,32 @@ jobs:
             Copy-Item -Path $env:INSTALL_LOG -Destination (Join-Path $diagDir "open890-install.log") -Force
           }
 
-          if ($env:OPEN890_START_LOG -and (Test-Path $env:OPEN890_START_LOG)) {
-            Copy-Item -Path $env:OPEN890_START_LOG -Destination (Join-Path $diagDir "open890-start.log") -Force
+          if ($env:OPEN890_START_STDOUT_LOG -and (Test-Path $env:OPEN890_START_STDOUT_LOG)) {
+            Copy-Item -Path $env:OPEN890_START_STDOUT_LOG -Destination (Join-Path $diagDir "open890-start-stdout.log") -Force
+          }
+
+          if ($env:OPEN890_START_STDERR_LOG -and (Test-Path $env:OPEN890_START_STDERR_LOG)) {
+            Copy-Item -Path $env:OPEN890_START_STDERR_LOG -Destination (Join-Path $diagDir "open890-start-stderr.log") -Force
           }
 
           if ($env:OPEN890_SERVER_LOG -and (Test-Path $env:OPEN890_SERVER_LOG)) {
             Copy-Item -Path $env:OPEN890_SERVER_LOG -Destination (Join-Path $diagDir "open890-server.log") -Force
+          }
+
+          if ($env:OPEN890_PROBE_LOG -and (Test-Path $env:OPEN890_PROBE_LOG)) {
+            Copy-Item -Path $env:OPEN890_PROBE_LOG -Destination (Join-Path $diagDir "open890-readiness-probe.log") -Force
+          }
+
+          if ($env:OPEN890_START_META_LOG -and (Test-Path $env:OPEN890_START_META_LOG)) {
+            Copy-Item -Path $env:OPEN890_START_META_LOG -Destination (Join-Path $diagDir "open890-start-meta.txt") -Force
+          }
+
+          if ($env:OPEN890_STOP_STDOUT_LOG -and (Test-Path $env:OPEN890_STOP_STDOUT_LOG)) {
+            Copy-Item -Path $env:OPEN890_STOP_STDOUT_LOG -Destination (Join-Path $diagDir "open890-stop-stdout.log") -Force
+          }
+
+          if ($env:OPEN890_STOP_STDERR_LOG -and (Test-Path $env:OPEN890_STOP_STDERR_LOG)) {
+            Copy-Item -Path $env:OPEN890_STOP_STDERR_LOG -Destination (Join-Path $diagDir "open890-stop-stderr.log") -Force
           }
 
           $launcherDirListing = Join-Path $diagDir "install-dir-listing.txt"
@@ -168,6 +259,13 @@ jobs:
             Select-Object TimeCreated, ProviderName, Id, LevelDisplayName, Message |
             Format-List |
             Out-File -FilePath $eventLogPath -Encoding UTF8
+
+          $processLogPath = Join-Path $diagDir "windows-process-snapshot.txt"
+          Get-Process -ErrorAction SilentlyContinue |
+            Where-Object { $_.ProcessName -match 'open890|beam|erl|epmd' } |
+            Select-Object Name, Id, StartTime, CPU, Path |
+            Format-Table -AutoSize |
+            Out-File -FilePath $processLogPath -Encoding UTF8
 
           $summary = Join-Path $diagDir "summary.txt"
           @(
