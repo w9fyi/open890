@@ -61,6 +61,25 @@ jobs:
         run: |
           cp docs/FIRST_TIME_SETUP.md _build/prod/rel/open890/FIRST_TIME_SETUP.md
 
+      - name: Keep Linux launcher files only
+        run: |
+          RELEASE_DIR="_build/prod/rel/open890"
+          rm -f \
+            "$RELEASE_DIR/open890.command" \
+            "$RELEASE_DIR/open890-stop.command" \
+            "$RELEASE_DIR/open890-launcher-macos.sh" \
+            "$RELEASE_DIR/open890.bat" \
+            "$RELEASE_DIR/open890-launcher.bat" \
+            "$RELEASE_DIR/open890-launcher.ps1"
+
+          test -f "$RELEASE_DIR/open890.sh"
+          test ! -e "$RELEASE_DIR/open890.command"
+          test ! -e "$RELEASE_DIR/open890-stop.command"
+          test ! -e "$RELEASE_DIR/open890-launcher-macos.sh"
+          test ! -e "$RELEASE_DIR/open890.bat"
+          test ! -e "$RELEASE_DIR/open890-launcher.bat"
+          test ! -e "$RELEASE_DIR/open890-launcher.ps1"
+
       - name: Compress release
         uses: master-atul/tar-action@v1.1.2
         with:
@@ -127,6 +146,25 @@ jobs:
       - name: Include first-time setup guide in bundle
         run: |
           Copy-Item -Path docs/FIRST_TIME_SETUP.md -Destination _build\prod\rel\open890\FIRST_TIME_SETUP.md -Force
+
+      - name: Keep Windows launcher files only
+        shell: powershell
+        run: |
+          $releaseDir = "_build\prod\rel\open890"
+          Remove-Item -Path @(
+            "$releaseDir\open890.command",
+            "$releaseDir\open890-stop.command",
+            "$releaseDir\open890-launcher-macos.sh",
+            "$releaseDir\open890.sh"
+          ) -Force -ErrorAction SilentlyContinue
+
+          if (!(Test-Path "$releaseDir\open890.bat")) { throw "Missing open890.bat" }
+          if (!(Test-Path "$releaseDir\open890-launcher.bat")) { throw "Missing open890-launcher.bat" }
+          if (!(Test-Path "$releaseDir\open890-launcher.ps1")) { throw "Missing open890-launcher.ps1" }
+          if (Test-Path "$releaseDir\open890.command") { throw "Unexpected macOS launcher file present" }
+          if (Test-Path "$releaseDir\open890-stop.command") { throw "Unexpected macOS stop file present" }
+          if (Test-Path "$releaseDir\open890-launcher-macos.sh") { throw "Unexpected macOS launcher script present" }
+          if (Test-Path "$releaseDir\open890.sh") { throw "Unexpected Linux launcher file present" }
 
       - name: Compress release
         run: |
@@ -209,6 +247,23 @@ jobs:
       - name: Include first-time setup guide in bundle
         run: |
           cp docs/FIRST_TIME_SETUP.md _build/prod/rel/open890/FIRST_TIME_SETUP.md
+
+      - name: Keep macOS launcher files only
+        run: |
+          RELEASE_DIR="_build/prod/rel/open890"
+          rm -f \
+            "$RELEASE_DIR/open890.bat" \
+            "$RELEASE_DIR/open890-launcher.bat" \
+            "$RELEASE_DIR/open890-launcher.ps1" \
+            "$RELEASE_DIR/open890.sh"
+
+          test -f "$RELEASE_DIR/open890.command"
+          test -f "$RELEASE_DIR/open890-stop.command"
+          test -f "$RELEASE_DIR/open890-launcher-macos.sh"
+          test ! -e "$RELEASE_DIR/open890.bat"
+          test ! -e "$RELEASE_DIR/open890-launcher.bat"
+          test ! -e "$RELEASE_DIR/open890-launcher.ps1"
+          test ! -e "$RELEASE_DIR/open890.sh"
 
       - name: Compress release
         uses: master-atul/tar-action@v1.1.2
