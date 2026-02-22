@@ -69,10 +69,22 @@ jobs:
             "$env:INSTALL_ROOT\open890-launcher.ps1",
             "$env:INSTALL_ROOT\bin\open890.bat"
           )
+          $unexpected = @(
+            "$env:INSTALL_ROOT\open890.command",
+            "$env:INSTALL_ROOT\open890-stop.command",
+            "$env:INSTALL_ROOT\open890-launcher-macos.sh",
+            "$env:INSTALL_ROOT\open890.sh"
+          )
 
           foreach ($path in $required) {
             if (!(Test-Path $path)) {
               throw "Missing required installed file: $path"
+            }
+          }
+
+          foreach ($path in $unexpected) {
+            if (Test-Path $path) {
+              throw "Unexpected non-Windows launcher file present: $path"
             }
           }
 

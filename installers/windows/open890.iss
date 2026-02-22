@@ -32,10 +32,14 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 Name: "diagnostics_issue_draft"; Description: "If startup fails, collect diagnostics and open a pre-filled GitHub issue draft"; GroupDescription: "Troubleshooting:"; Flags: unchecked
 
 [Files]
-Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "open890.command;open890-stop.command;open890-launcher-macos.sh;open890.sh"
 
 [InstallDelete]
 Type: files; Name: "{app}\open890-diagnostics-optin.txt"
+Type: files; Name: "{app}\open890.command"
+Type: files; Name: "{app}\open890-stop.command"
+Type: files; Name: "{app}\open890-launcher-macos.sh"
+Type: files; Name: "{app}\open890.sh"
 
 [Icons]
 Name: "{autoprograms}\open890"; Filename: "{app}\open890-launcher.bat"; WorkingDir: "{app}"
