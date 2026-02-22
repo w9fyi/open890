@@ -202,7 +202,7 @@ in order to get open890 running on a RPi.
 If you are publishing a new release, use one command:
 
 ```bash
-make publish_release VERSION=v0.1.4
+./pushrelease v0.1.4
 ```
 
 This does the following:
@@ -218,6 +218,12 @@ Requirements:
 - Clean git working tree (no uncommitted changes).
 - Push access to `w9fyi/open890`.
 - Repository secrets configured for build (`SECRET_KEY_BASE`).
+
+Alternative (same behavior):
+
+```bash
+make publish_release VERSION=v0.1.4
+```
 
 ## Network Settings & Security
 
