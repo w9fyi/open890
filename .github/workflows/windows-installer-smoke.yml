@@ -101,7 +101,8 @@ jobs:
             Remove-Item -Path $serverLog -Force
           }
 
-          cmd.exe /c "`"$env:INSTALL_ROOT\bin\open890.bat`" start > `"$startLog`" 2>&1"
+          $startCommand = "`"$env:INSTALL_ROOT\bin\open890.bat`" start > `"$startLog`" 2>&1"
+          Start-Process -FilePath "cmd.exe" -ArgumentList "/c $startCommand" -WindowStyle Hidden
 
           for ($i = 0; $i -lt $timeoutSeconds; $i++) {
             try {
