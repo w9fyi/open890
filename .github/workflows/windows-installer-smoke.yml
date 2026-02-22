@@ -94,6 +94,7 @@ jobs:
           $appUrl = "${{ inputs.app_url }}"
           $timeoutSeconds = [int]"${{ inputs.timeout_seconds }}"
           $startScript = Join-Path $env:INSTALL_ROOT "bin\open890.bat"
+          $traceScript = Join-Path $env:INSTALL_ROOT "bin\open890-trace.bat"
           $serverLog = Join-Path $env:TEMP "open890-server.log"
           $startStdoutLog = Join-Path $env:RUNNER_TEMP "open890-start-stdout.log"
           $startStderrLog = Join-Path $env:RUNNER_TEMP "open890-start-stderr.log"
@@ -118,9 +119,15 @@ jobs:
             throw "Start script was not found: $startScript"
           }
 
+          Copy-Item -Path $startScript -Destination $traceScript -Force
+          $traceScriptContent = Get-Content -Path $traceScript -Raw
+          $traceScriptContent = $traceScriptContent -replace '(?im)^\s*@echo off\s*$', 'echo on'
+          Set-Content -Path $traceScript -Value $traceScriptContent -Encoding ascii
+          $env:ELIXIR_CLI_ECHO = "1"
+
           $startProc = Start-Process `
             -FilePath $env:ComSpec `
-            -ArgumentList @("/d", "/c", "`"$startScript`" start") `
+            -ArgumentList @("/d", "/v:on", "/c", "`"$traceScript`" start") `
             -WindowStyle Hidden `
             -PassThru `
             -RedirectStandardOutput $startStdoutLog `
@@ -129,6 +136,7 @@ jobs:
           @(
             "start_pid=$($startProc.Id)",
             "start_script=$startScript",
+            "trace_script=$traceScript",
             "app_url=$appUrl",
             "timeout_seconds=$timeoutSeconds"
           ) | Out-File -FilePath $startMetaLog -Encoding UTF8
@@ -153,9 +161,13 @@ jobs:
             if ($startProc.HasExited) {
               $startProc.WaitForExit()
               $startProc.Refresh()
-              $startExitCode = $startProc.ExitCode
-              Add-Content -Path $probeLog -Value ("{0}`tstart_process_exited={1}" -f (Get-Date -Format o), $startExitCode)
-              if ($startExitCode -ne 0) {
+              try {
+                $startExitCode = [int]$startProc.ExitCode
+              } catch {
+                $startExitCode = $null
+              }
+              Add-Content -Path $probeLog -Value ("{0}`tstart_process_exited={1}" -f (Get-Date -Format o), ($(if ($startExitCode -ne $null) { $startExitCode } else { "n/a" })))
+              if ($startExitCode -ne $null -and $startExitCode -ne 0) {
                 break
               }
             }
@@ -170,7 +182,11 @@ jobs:
           if ($startProc.HasExited -and $startExitCode -eq $null) {
             $startProc.WaitForExit()
             $startProc.Refresh()
-            $startExitCode = $startProc.ExitCode
+            try {
+              $startExitCode = [int]$startProc.ExitCode
+            } catch {
+              $startExitCode = $null
+            }
           }
 
           Add-Content -Path $startMetaLog -Value ("start_process_final_state={0}" -f ($(if ($startProc.HasExited) { "exited" } else { "running" })))
@@ -189,6 +205,7 @@ jobs:
         shell: powershell
         run: |
           $stopScript = "$env:INSTALL_ROOT\bin\open890.bat"
+          $traceStopScript = "$env:INSTALL_ROOT\bin\open890-trace.bat"
           $stopStdoutLog = Join-Path $env:RUNNER_TEMP "open890-stop-stdout.log"
           $stopStderrLog = Join-Path $env:RUNNER_TEMP "open890-stop-stderr.log"
           $stopMetaLog = Join-Path $env:RUNNER_TEMP "open890-stop-meta.txt"
@@ -201,9 +218,14 @@ jobs:
           }
 
           if (Test-Path $stopScript) {
+            $scriptToRun = $stopScript
+            if (Test-Path $traceStopScript) {
+              $scriptToRun = $traceStopScript
+            }
+            $env:ELIXIR_CLI_ECHO = "1"
             $stopProc = Start-Process `
               -FilePath $env:ComSpec `
-              -ArgumentList @("/d", "/c", "`"$stopScript`" stop") `
+              -ArgumentList @("/d", "/v:on", "/c", "`"$scriptToRun`" stop") `
               -WindowStyle Hidden `
               -PassThru `
               -Wait `
@@ -211,6 +233,7 @@ jobs:
               -RedirectStandardError $stopStderrLog
 
             Add-Content -Path $stopMetaLog -Value ("stop_exit_code={0}" -f $stopProc.ExitCode)
+            Add-Content -Path $stopMetaLog -Value ("stop_script={0}" -f $scriptToRun)
             if ($stopProc.ExitCode -ne 0) {
               Add-Content -Path $stopStderrLog -Value ("stop_exit_code={0}" -f $stopProc.ExitCode)
             }
@@ -267,6 +290,7 @@ jobs:
               "installed-open890-launcher.bat" = (Join-Path $env:INSTALL_ROOT "open890-launcher.bat")
               "installed-open890-launcher.ps1" = (Join-Path $env:INSTALL_ROOT "open890-launcher.ps1")
               "installed-bin-open890.bat" = (Join-Path $env:INSTALL_ROOT "bin\open890.bat")
+              "installed-bin-open890-trace.bat" = (Join-Path $env:INSTALL_ROOT "bin\open890-trace.bat")
             }
 
             foreach ($destName in $scriptFiles.Keys) {
