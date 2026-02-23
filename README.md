@@ -105,6 +105,8 @@ Platform/architecture-specific binary releases are available from [releases](htt
 
 This solves the open890 window closing immediately upon startup, or resolves the error message "unable to load emulator DLL".
 
+For Windows binary releases, use `v0.1.7` or newer.
+
 Then, install open890:
 
   * Preferred: Download the Windows installer `.exe` and run it.
@@ -115,7 +117,8 @@ Installer flow:
   * Run `open890-<version>-setup.exe`
   * Accept prompts, choose install location, and allow desktop shortcut creation
   * Optional: enable the troubleshooting checkbox to auto-collect diagnostics and open a pre-filled GitHub issue draft if startup fails
-  * Launch the `open890` desktop/start-menu icon
+  * Launch the `open890` desktop/start-menu icon (recommended)
+  * Do not launch `C:\Program Files\open890\bin\open890.bat` directly
   * The launcher starts open890 and opens your browser to `http://localhost:4000`
   * If startup fails with troubleshooting enabled, a diagnostics zip is created on your Desktop and a pre-filled GitHub issue draft opens automatically
 

@@ -28,11 +28,12 @@ If you skip this, open890 may close immediately on startup.
 
 1. Open releases:
    - https://github.com/w9fyi/open890/releases/latest
-2. Download:
+2. Use `v0.1.7` or newer for Windows binaries.
+3. Download:
    - `open890-<version>-setup.exe` (recommended)
-3. Run the installer and follow prompts.
-4. Keep desktop shortcut enabled when prompted.
-5. Optional: enable the troubleshooting checkbox to auto-collect logs and open a pre-filled GitHub issue draft if startup fails.
+4. Run the installer and follow prompts.
+5. Keep desktop shortcut enabled when prompted.
+6. Optional: enable the troubleshooting checkbox to auto-collect logs and open a pre-filled GitHub issue draft if startup fails.
 
 ### Step 3: Start open890
 
@@ -44,7 +45,8 @@ Zip fallback (advanced users):
 
 1. Download `open890-<version>-windows-x64.zip`.
 2. Extract it.
-3. Run `open890.bat` from the extracted folder.
+3. Run `open890.bat` from the extracted top-level `open890` folder.
+4. Do not run `bin\open890.bat` directly.
 
 ### Step 4: Open the Web UI
 
@@ -134,6 +136,8 @@ sudo chmod +x \
    - Confirm radio IP, same LAN/subnet, and no firewall blocks between PC and radio.
 4. App closes right away on Windows:
    - Install the Visual C++ runtime listed above.
+5. Windows installer launches but service never comes up:
+   - Upgrade to `v0.1.7` or newer.
 
 ## Need Help?
 

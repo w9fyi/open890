@@ -29,6 +29,19 @@ Use this runbook to publish open890 releases with repeatable steps and clear rec
    - `open890-vX.Y.Z-ubuntu-x64.tar.gz`
    - `open890-FIRST_TIME_SETUP.md`
 
+## Windows Installer Validation (Required)
+After a release is published, run the Windows installer smoke workflow against the published `.exe`.
+
+1. Trigger smoke run:
+   - `gh workflow run windows-installer-smoke.yml --repo w9fyi/open890 --ref <branch> -f installer_url='https://github.com/w9fyi/open890/releases/download/vX.Y.Z/open890-vX.Y.Z-setup.exe' -f app_url='http://localhost:4000' -f timeout_seconds='90'`
+2. Confirm required steps pass:
+   - `Verify expected installed files`
+   - `Start open890 and wait for readiness`
+   - `Stop open890`
+3. If smoke fails, download diagnostics artifact:
+   - `gh run download <run_id> --repo w9fyi/open890 -n windows-installer-smoke-diagnostics -D /tmp/open890-smoke-<run_id>`
+4. If failure is a real release blocker, ship a new patch release (`vX.Y.(Z+1)`).
+
 ## Monitoring Commands
 - Latest release workflow runs:
   - `gh run list --repo w9fyi/open890 --workflow release.yml --limit 10`
@@ -63,7 +76,23 @@ Current working configuration in `.github/workflows/release.yml`:
 
 If macOS is cancelled at 0s again, check runner label support first.
 
+## Windows Packaging Notes (Important)
+Fixes proven in `v0.1.7`:
+- Windows installer excludes non-Windows launchers (`.command`, macOS shell launcher, Linux shell launcher).
+- Release build patches `bin/open890.bat` to use:
+  - `cd /d "%~dp0\.."`
+- Smoke workflow validates both:
+  - non-Windows files are absent in Windows install root
+  - installed `bin/open890.bat` contains the `cd /d` drive-switch line
+
+If Windows startup regresses, inspect smoke traced logs first:
+- `open890-start-stdout.log`
+- `open890-start-stderr.log`
+- `open890-readiness-probe.log`
+- `installed-bin-open890.bat`
+
 ## Post-Release Checklist
 - Confirm release is published (not draft, not missing assets).
 - Spot-check installer download links.
+- Run and pass Windows installer smoke workflow on released installer URL.
 - Post announcement using templates in `docs/ANNOUNCEMENTS.md`.
