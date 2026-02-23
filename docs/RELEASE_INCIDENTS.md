@@ -54,3 +54,17 @@
 - Successful recovery:
   - Release run `22288148252` (`v0.1.7`) completed successfully.
   - Smoke run `22288377628` against `open890-v0.1.7-setup.exe` passed end-to-end.
+
+## 2026-02-23: First post-release field issue triage (`v0.1.7`)
+- Issue opened:
+  - `#1` "open890web failure to launch"
+  - https://github.com/w9fyi/open890/issues/1
+- Reporter symptom:
+  - batch window opens, browser opens, no local connection.
+- Triage action taken:
+  - Requested installer version, launch path used, and script-line verification.
+  - Asked for diagnostics bundle/setup log attachment.
+  - Triage comment:
+    - https://github.com/w9fyi/open890/issues/1#issuecomment-3942030849
+- Notes:
+  - Keep issue triage linked here so future sessions can quickly reconstruct post-release support history.

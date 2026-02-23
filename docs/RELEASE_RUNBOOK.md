@@ -96,3 +96,17 @@ If Windows startup regresses, inspect smoke traced logs first:
 - Spot-check installer download links.
 - Run and pass Windows installer smoke workflow on released installer URL.
 - Post announcement using templates in `docs/ANNOUNCEMENTS.md`.
+
+## Post-Release Support Logging
+After announcing a release, check incoming issues and log outcomes in `docs/RELEASE_INCIDENTS.md`.
+
+1. List open issues:
+   - `gh issue list --repo w9fyi/open890 --state open --limit 30`
+2. Review new issues:
+   - `gh issue view <issue_number> --repo w9fyi/open890`
+3. Triage with required details:
+   - exact installer filename/version
+   - launch path used (desktop/start-menu vs direct `bin/open890.bat`)
+   - diagnostics bundle or setup log attachment
+4. Record incident and corrective action summary in:
+   - `docs/RELEASE_INCIDENTS.md`
