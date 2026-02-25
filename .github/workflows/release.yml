@@ -437,8 +437,136 @@ jobs:
             ${{ runner.temp }}/launcher-stderr.log
           if-no-files-found: ignore
 
+  smoke-ubuntu:
+    needs: [build-ubuntu]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Ubuntu artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-ubuntu
+          path: ${{ runner.temp }}/release
+
+      - name: Extract release
+        run: |
+          TARBALL=$(find "$RUNNER_TEMP/release" -name "*.tar.gz" | head -1)
+          if [ -z "$TARBALL" ]; then echo "Tarball not found in artifact."; exit 1; fi
+          tar -xzf "$TARBALL" -C "$RUNNER_TEMP/release"
+          RELEASE_ROOT=$(find "$RUNNER_TEMP/release" -maxdepth 1 -type d -name "open890" | head -1)
+          if [ -z "$RELEASE_ROOT" ]; then echo "open890 directory not found after extraction."; exit 1; fi
+          echo "RELEASE_ROOT=$RELEASE_ROOT" >> "$GITHUB_ENV"
+
+      - name: Verify installed files
+        run: |
+          for f in "$RELEASE_ROOT/open890.sh" "$RELEASE_ROOT/bin/open890"; do
+            if [ ! -f "$f" ]; then echo "Missing required file: $f"; exit 1; fi
+          done
+          for f in \
+            "$RELEASE_ROOT/open890.command" \
+            "$RELEASE_ROOT/open890-stop.command" \
+            "$RELEASE_ROOT/open890-launcher-macos.sh" \
+            "$RELEASE_ROOT/open890-launcher.bat" \
+            "$RELEASE_ROOT/open890-launcher.ps1"; do
+            if [ -f "$f" ]; then echo "Unexpected non-Linux file present: $f"; exit 1; fi
+          done
+
+      - name: Start open890 and wait for readiness
+        run: |
+          SERVER_LOG="$RUNNER_TEMP/open890-server.log"
+          echo "OPEN890_SERVER_LOG=$SERVER_LOG" >> "$GITHUB_ENV"
+          cd "$RELEASE_ROOT"
+          nohup ./bin/open890 start > "$SERVER_LOG" 2>&1 &
+          READY=0
+          for i in $(seq 1 90); do
+            if curl -fsSI "http://localhost:4000" >/dev/null 2>&1; then
+              READY=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$READY" -ne 1 ]; then
+            echo "=== server log ==="
+            cat "$SERVER_LOG" 2>/dev/null || echo "(no log)"
+            echo "open890 did not become ready within 90 seconds."
+            exit 1
+          fi
+
+      - name: Stop open890
+        if: always()
+        run: |
+          cd "$RELEASE_ROOT" && ./bin/open890 stop 2>/dev/null || true
+
+      - name: Upload smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-ubuntu-diagnostics
+          path: ${{ env.OPEN890_SERVER_LOG }}
+          if-no-files-found: ignore
+
+  smoke-macos:
+    needs: [build-macos]
+    runs-on: macos-latest
+    steps:
+      - name: Download macOS pkg artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-macos-pkg
+          path: ${{ runner.temp }}/pkg
+
+      - name: Install macOS pkg
+        run: |
+          PKG_PATH=$(find "$RUNNER_TEMP/pkg" -name "*.pkg" | head -1)
+          if [ -z "$PKG_PATH" ]; then echo "pkg not found in artifact."; exit 1; fi
+          xattr -rd com.apple.quarantine "$PKG_PATH" 2>/dev/null || true
+          sudo installer -pkg "$PKG_PATH" -target /
+          echo "INSTALL_ROOT=/Applications/open890" >> "$GITHUB_ENV"
+
+      - name: Verify installed files and executable bits
+        run: |
+          for f in \
+            "$INSTALL_ROOT/open890.command" \
+            "$INSTALL_ROOT/open890-stop.command" \
+            "$INSTALL_ROOT/open890-launcher-macos.sh" \
+            "$INSTALL_ROOT/bin/open890"; do
+            if [ ! -f "$f" ]; then echo "Missing required file: $f"; exit 1; fi
+            if [ ! -x "$f" ]; then echo "Not executable: $f"; exit 1; fi
+          done
+          for f in \
+            "$INSTALL_ROOT/open890-launcher.bat" \
+            "$INSTALL_ROOT/open890-launcher.ps1" \
+            "$INSTALL_ROOT/open890.sh"; do
+            if [ -f "$f" ]; then echo "Unexpected non-macOS file present: $f"; exit 1; fi
+          done
+
+      - name: Start open890 via macOS launcher
+        run: |
+          SERVER_LOG="$RUNNER_TEMP/open890-server.log"
+          echo "OPEN890_SERVER_LOG=$SERVER_LOG" >> "$GITHUB_ENV"
+          OPEN890_LOG_FILE="$SERVER_LOG" OPEN890_START_TIMEOUT_SECONDS=90 \
+            "$INSTALL_ROOT/open890-launcher-macos.sh"
+          if ! /usr/bin/curl -fsSI "http://localhost:4000" >/dev/null 2>&1; then
+            echo "=== server log ==="
+            cat "$SERVER_LOG" 2>/dev/null || echo "(no log)"
+            echo "open890 not ready after launcher exit."
+            exit 1
+          fi
+
+      - name: Stop open890
+        if: always()
+        run: |
+          "$INSTALL_ROOT/bin/open890" stop 2>/dev/null || true
+
+      - name: Upload smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-macos-diagnostics
+          path: ${{ env.OPEN890_SERVER_LOG }}
+          if-no-files-found: ignore
+
   publish-release:
-    needs: [build-ubuntu, smoke-windows, build-macos]
+    needs: [smoke-ubuntu, smoke-windows, smoke-macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

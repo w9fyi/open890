@@ -28,7 +28,7 @@ If you skip this, open890 may close immediately on startup.
 
 1. Open releases:
    - https://github.com/w9fyi/open890/releases/latest
-2. Use `v0.1.7` or newer for Windows binaries.
+2. Use `v0.1.8` or newer for Windows binaries.
 3. Download:
    - `open890-<version>-setup.exe` (recommended)
 4. Run the installer and follow prompts.
@@ -137,7 +137,7 @@ sudo chmod +x \
 4. App closes right away on Windows:
    - Install the Visual C++ runtime listed above.
 5. Windows installer launches but service never comes up:
-   - Upgrade to `v0.1.7` or newer.
+   - Upgrade to `v0.1.8` or newer.
 
 ## Need Help?
 

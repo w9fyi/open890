@@ -20,6 +20,9 @@ Use this runbook to publish open890 releases with repeatable steps and clear rec
    - `build-ubuntu`
    - `build-windows`
    - `build-macos`
+   - `smoke-ubuntu`
+   - `smoke-windows`
+   - `smoke-macos`
    - `publish-release`
 5. Verify release page assets:
    - `open890-vX.Y.Z-setup.exe`
@@ -37,6 +40,7 @@ After a release is published, run the Windows installer smoke workflow against t
 2. Confirm required steps pass:
    - `Verify expected installed files`
    - `Start open890 and wait for readiness`
+   - `Start open890 via PS1 launcher (headless)`
    - `Stop open890`
 3. If smoke fails, download diagnostics artifact:
    - `gh run download <run_id> --repo w9fyi/open890 -n windows-installer-smoke-diagnostics -D /tmp/open890-smoke-<run_id>`
@@ -85,10 +89,18 @@ Fixes proven in `v0.1.7`:
   - non-Windows files are absent in Windows install root
   - installed `bin/open890.bat` contains the `cd /d` drive-switch line
 
+Fixes proven in `v0.1.8`:
+- `open890-launcher.ps1`: cmd.exe quote-stripping bug — `Start-Process` with 4-quote argument caused Windows to run `C:\Program` instead of the full path. Fixed by wrapping the command in outer quotes.
+- `open890-launcher.ps1`: Desktop path resolution under elevation — `GetFolderPath("Desktop")` resolved to admin/system Desktop. Fixed by using `$env:USERPROFILE\Desktop` first.
+- Smoke workflow now tests startup via PS1 launcher (`-Headless`) in addition to direct `bin\open890.bat` invocation.
+- `publish-release` now blocked on `smoke-ubuntu`, `smoke-windows`, and `smoke-macos`.
+
 If Windows startup regresses, inspect smoke traced logs first:
 - `open890-start-stdout.log`
 - `open890-start-stderr.log`
 - `open890-readiness-probe.log`
+- `launcher-stdout.log`
+- `launcher-stderr.log`
 - `installed-bin-open890.bat`
 
 ## Post-Release Checklist

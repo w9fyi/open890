@@ -20,6 +20,7 @@ DefaultDirName={autopf}\open890
 DefaultGroupName=open890
 DisableProgramGroupPage=yes
 OutputDir={#OutputDir}
+ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 Compression=lzma
 SolidCompression=yes
@@ -47,4 +48,4 @@ Name: "{autodesktop}\open890"; Filename: "{app}\open890-launcher.bat"; WorkingDi
 
 [Run]
 Filename: "{cmd}"; Parameters: "/C echo enabled>""{app}\open890-diagnostics-optin.txt"""; Flags: runhidden; Tasks: diagnostics_issue_draft
-Filename: "{app}\open890-launcher.bat"; Description: "Launch open890 now"; Flags: postinstall skipifsilent
+Filename: "{app}\open890-launcher.bat"; Description: "Launch open890 now"; Flags: postinstall skipifsilent runasoriginaluser
