@@ -414,7 +414,7 @@ jobs:
           "LAUNCHER_EXIT_CODE=$($proc.ExitCode)" >> $env:GITHUB_ENV
           if ($proc.ExitCode -ne 0) {
             Get-Content (Join-Path $env:RUNNER_TEMP "launcher-stderr.log") -ErrorAction SilentlyContinue
-            throw "Launcher exited with code $($proc.ExitCode) — open890 did not become ready."
+            throw "Launcher exited with code $($proc.ExitCode) - open890 did not become ready."
           }
 
       - name: Stop open890

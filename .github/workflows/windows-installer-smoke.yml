@@ -242,7 +242,7 @@ jobs:
           if ($proc.ExitCode -ne 0) {
             Write-Host "=== launcher stderr ==="
             Get-Content $launcherStderrLog -ErrorAction SilentlyContinue
-            throw "PS1 launcher exited with code $($proc.ExitCode) — open890 did not become ready via launcher path."
+            throw "PS1 launcher exited with code $($proc.ExitCode) - open890 did not become ready via launcher path."
           }
 
       - name: Stop open890
