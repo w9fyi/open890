@@ -394,16 +394,15 @@ jobs:
             throw "bin\open890.bat is missing the drive switch fix (cd /d)."
           }
 
-      - name: Verify PS1 launcher quote fix
+      - name: Verify bat launcher content
         shell: powershell
         run: |
-          # Assert that the installed PS1 launcher uses outer-quote wrapping so that
-          # cmd.exe /c does not strip inner quotes around paths containing spaces.
-          $ps1 = Get-Content "$env:INSTALL_ROOT\open890-launcher.ps1" -Raw
-          if ($ps1 -notmatch 'ArgumentList @\("/d"') {
-            throw "PS1 launcher is missing the outer-quote Start-Process fix."
+          # Assert that the installed bat launcher directly calls bin\open890.bat start.
+          $bat = Get-Content "$env:INSTALL_ROOT\open890-launcher.bat" -Raw
+          if ($bat -notmatch 'call \.\\bin\\open890\.bat start') {
+            throw "open890-launcher.bat does not contain expected 'call .\bin\open890.bat start'."
           }
-          Write-Host "PS1 launcher quote fix verified."
+          Write-Host "Bat launcher content verified."
 
       - name: Start open890 server and wait for readiness
         shell: powershell
