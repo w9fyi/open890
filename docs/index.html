@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>open890 — Download</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    header { margin-bottom: 2.5rem; }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #f0f6fc;
+      margin-bottom: 0.4rem;
+    }
+
+    .tagline {
+      color: #8b949e;
+      font-size: 1rem;
+    }
+
+    /* Recommended download card */
+    .recommended {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .recommended h2 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #8b949e;
+      margin-bottom: 1rem;
+    }
+
+    .platform-label {
+      font-size: 1rem;
+      color: #8b949e;
+      margin-bottom: 0.75rem;
+    }
+
+    .primary-btn {
+      display: inline-block;
+      background: #238636;
+      color: #fff;
+      text-decoration: none;
+      padding: 0.65rem 1.25rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      transition: background 0.15s;
+    }
+
+    .primary-btn:hover, .primary-btn:focus {
+      background: #2ea043;
+      outline: 2px solid #58a6ff;
+      outline-offset: 2px;
+    }
+
+    .file-name {
+      display: block;
+      font-size: 0.85rem;
+      color: #8b949e;
+      margin-top: 0.4rem;
+      font-family: monospace;
+    }
+
+    /* Version badge */
+    .version-badge {
+      display: inline-block;
+      background: #1f6feb33;
+      border: 1px solid #1f6feb;
+      color: #58a6ff;
+      border-radius: 20px;
+      padding: 0.2rem 0.75rem;
+      font-size: 0.85rem;
+      margin-bottom: 1.25rem;
+    }
+
+    /* All platforms table */
+    .all-downloads { margin-bottom: 2rem; }
+
+    .all-downloads h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #8b949e;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #30363d;
+    }
+
+    .platform-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid #21262d;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .platform-name {
+      font-weight: 600;
+      color: #e6edf3;
+      min-width: 90px;
+    }
+
+    .download-links {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .dl-link {
+      color: #58a6ff;
+      text-decoration: none;
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+
+    .dl-link:hover, .dl-link:focus {
+      text-decoration: underline;
+      outline: 2px solid #58a6ff;
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
+
+    .dl-tag {
+      font-size: 0.75rem;
+      color: #8b949e;
+      background: #21262d;
+      border-radius: 4px;
+      padding: 0.1rem 0.4rem;
+      margin-left: 0.3rem;
+    }
+
+    /* Links section */
+    .links { margin-bottom: 2rem; }
+
+    .links h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #8b949e;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #30363d;
+    }
+
+    .links ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .links a {
+      color: #58a6ff;
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+
+    .links a:hover, .links a:focus {
+      text-decoration: underline;
+      outline: 2px solid #58a6ff;
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
+
+    /* Loading / error states */
+    #loading {
+      color: #8b949e;
+      font-size: 0.95rem;
+      padding: 1rem 0;
+    }
+
+    #error-msg {
+      color: #f85149;
+      font-size: 0.95rem;
+      padding: 1rem 0;
+      display: none;
+    }
+
+    footer {
+      color: #484f58;
+      font-size: 0.8rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid #21262d;
+    }
+
+    footer a { color: #8b949e; }
+
+    /* Skip nav for screen readers */
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+    }
+    .skip-link:focus {
+      left: 1rem;
+      top: 1rem;
+      background: #238636;
+      color: #fff;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#download">Skip to download</a>
+
+  <div class="container">
+    <header>
+      <h1>open890</h1>
+      <p class="tagline">Browser-based control surface for the Kenwood TS-890S</p>
+    </header>
+
+    <main id="download">
+      <div id="loading" role="status" aria-live="polite">Loading latest release&hellip;</div>
+      <div id="error-msg" role="alert" aria-live="assertive"></div>
+      <div id="content" aria-live="polite" hidden></div>
+    </main>
+
+    <section class="links">
+      <h2>Resources</h2>
+      <ul>
+        <li><a href="https://github.com/w9fyi/open890">GitHub repository</a></li>
+        <li><a href="https://github.com/w9fyi/open890/releases">All releases</a></li>
+        <li><a href="https://github.com/w9fyi/open890/issues">Report an issue</a></li>
+      </ul>
+    </section>
+
+    <footer>
+      <p>open890 is free, open-source software. &mdash; <a href="https://github.com/w9fyi/open890/blob/main/LICENSE">License</a></p>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      var API = 'https://api.github.com/repos/w9fyi/open890/releases/latest';
+
+      function detectPlatform() {
+        var ua = navigator.userAgent || '';
+        var p  = navigator.platform  || '';
+        if (/Win/i.test(p) || /Windows/i.test(ua)) return 'windows';
+        if (/Mac/i.test(p) || /Macintosh|Mac OS X/i.test(ua)) return 'macos';
+        if (/Linux/i.test(p) || /Linux/i.test(ua)) return 'linux';
+        return 'unknown';
+      }
+
+      function assetsByPlatform(assets) {
+        var r = { windows: [], macos: [], linux: [], docs: [] };
+        assets.forEach(function (a) {
+          var n = a.name;
+          if (/setup\.exe$/i.test(n) || /windows.*\.zip$/i.test(n)) r.windows.push(a);
+          else if (/macos.*\.pkg$/i.test(n) || /macos.*\.tar\.gz$/i.test(n)) r.macos.push(a);
+          else if (/ubuntu|linux/i.test(n)) r.linux.push(a);
+          else if (/\.md$/i.test(n)) r.docs.push(a);
+        });
+        return r;
+      }
+
+      function platformLabel(key) {
+        return { windows: 'Windows', macos: 'macOS', linux: 'Linux', unknown: 'Your platform' }[key] || 'Your platform';
+      }
+
+      function primaryAsset(assets, platform) {
+        // Prefer installer over raw archive
+        if (platform === 'windows') return assets.find(function(a){ return /setup\.exe$/i.test(a.name); }) || assets[0];
+        if (platform === 'macos')   return assets.find(function(a){ return /\.pkg$/i.test(a.name); }) || assets[0];
+        return assets[0];
+      }
+
+      function linkTag(label) {
+        return '<span class="dl-tag" aria-label="' + label + '">' + label + '</span>';
+      }
+
+      function assetLink(a, labelText) {
+        return '<a class="dl-link" href="' + a.browser_download_url + '">' + (labelText || a.name) + '</a>';
+      }
+
+      function renderDownloadLinks(assets) {
+        return assets.map(function (a) {
+          var label = /setup\.exe$/i.test(a.name) ? 'installer'
+                    : /\.pkg$/i.test(a.name)      ? 'installer'
+                    : /\.zip$/i.test(a.name)       ? 'zip'
+                    : /\.tar\.gz$/i.test(a.name)   ? 'tar.gz'
+                    : '';
+          return '<a class="dl-link" href="' + a.browser_download_url + '">'
+               + a.name
+               + (label ? linkTag(label) : '')
+               + '</a>';
+        }).join('');
+      }
+
+      function render(release) {
+        var version  = release.tag_name;
+        var assets   = assetsByPlatform(release.assets || []);
+        var platform = detectPlatform();
+        var myAssets = assets[platform] || [];
+        var primary  = myAssets.length ? primaryAsset(myAssets, platform) : null;
+
+        var setupGuide = (release.assets || []).find(function(a){ return /FIRST_TIME_SETUP/i.test(a.name); });
+
+        var html = '';
+
+        // Version badge
+        html += '<div class="version-badge" aria-label="Version ' + version + '">' + version + '</div>';
+
+        // Recommended card
+        html += '<section class="recommended" aria-label="Recommended download">';
+        html += '<h2>Recommended download</h2>';
+
+        if (primary) {
+          html += '<p class="platform-label">Detected platform: <strong>' + platformLabel(platform) + '</strong></p>';
+          html += '<a class="primary-btn" href="' + primary.browser_download_url + '">'
+               +  'Download for ' + platformLabel(platform)
+               +  '</a>';
+          html += '<span class="file-name">' + primary.name + '</span>';
+        } else {
+          html += '<p class="platform-label">Could not detect your platform — see all downloads below.</p>';
+        }
+
+        html += '</section>';
+
+        // All platforms
+        html += '<section class="all-downloads" aria-label="All platform downloads">';
+        html += '<h2>All downloads</h2>';
+
+        [
+          { key: 'windows', label: 'Windows' },
+          { key: 'macos',   label: 'macOS'   },
+          { key: 'linux',   label: 'Linux'   },
+        ].forEach(function (row) {
+          var rowAssets = assets[row.key];
+          if (!rowAssets || !rowAssets.length) return;
+          html += '<div class="platform-row">';
+          html += '<span class="platform-name">' + row.label + '</span>';
+          html += '<div class="download-links">' + renderDownloadLinks(rowAssets) + '</div>';
+          html += '</div>';
+        });
+
+        if (setupGuide) {
+          html += '<div class="platform-row">';
+          html += '<span class="platform-name">Setup guide</span>';
+          html += '<div class="download-links"><a class="dl-link" href="' + setupGuide.browser_download_url + '">open890-FIRST_TIME_SETUP.md</a></div>';
+          html += '</div>';
+        }
+
+        html += '</section>';
+
+        return html;
+      }
+
+      function showError(msg) {
+        document.getElementById('loading').style.display = 'none';
+        var el = document.getElementById('error-msg');
+        el.textContent = msg;
+        el.style.display = 'block';
+      }
+
+      fetch(API)
+        .then(function (res) {
+          if (!res.ok) throw new Error('GitHub API returned ' + res.status);
+          return res.json();
+        })
+        .then(function (release) {
+          document.getElementById('loading').style.display = 'none';
+          var content = document.getElementById('content');
+          content.innerHTML = render(release);
+          content.hidden = false;
+        })
+        .catch(function (err) {
+          showError('Could not load release info. Please visit the GitHub releases page directly.');
+          console.error(err);
+        });
+    })();
+  </script>
+</body>
+</html>
