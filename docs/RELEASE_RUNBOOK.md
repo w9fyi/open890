@@ -97,18 +97,20 @@ Fixes proven in `v0.1.7`:
   - installed `bin/open890.bat` contains the `cd /d` drive-switch line
 
 Fixes proven in `v0.1.8`:
-- `open890-launcher.ps1`: cmd.exe quote-stripping bug — `Start-Process` with 4-quote argument caused Windows to run `C:\Program` instead of the full path. Fixed by wrapping the command in outer quotes.
-- `open890-launcher.ps1`: Desktop path resolution under elevation — `GetFolderPath("Desktop")` resolved to admin/system Desktop. Fixed by using `$env:USERPROFILE\Desktop` first.
-- Smoke workflow now tests startup via PS1 launcher (`-Headless`) in addition to direct `bin\open890.bat` invocation.
+- `open890-launcher.ps1`: cmd.exe quote-stripping bug — `Start-Process` using `/c "<path>" args` caused Windows to strip the outer quotes, then try to run `C:\Program` instead of the full path when installed to `C:\Program Files\open890` (the default). Fixed by wrapping the entire command in an extra outer pair of `"` and passing it as an array element: `-ArgumentList @("/d", "/c", "`"<cmd>`"")`.
+- `open890-launcher.ps1`: Desktop path resolution under elevation — `GetFolderPath("Desktop")` resolved to admin/system Desktop rather than user Desktop. Fixed by using `$env:USERPROFILE\Desktop` first.
+- `open890-launcher.ps1`: Erlang release log dir (`$RootDir\log\`) now collected in diagnostics bundle.
 - `publish-release` now blocked on `smoke-ubuntu`, `smoke-windows`, and `smoke-macos`.
+- Smoke-windows uses **direct server start** (not PS1 launcher) + a content-check assertion:
+  - `Verify PS1 launcher quote fix` — asserts installed PS1 contains the outer-quote `ArgumentList` pattern
+  - `Start open890 server and wait for readiness` — starts `bin\open890.bat start` directly, polls port 4000
 
-If Windows startup regresses, inspect smoke traced logs first:
-- `open890-start-stdout.log`
-- `open890-start-stderr.log`
-- `open890-readiness-probe.log`
-- `launcher-stdout.log`
-- `launcher-stderr.log`
-- `installed-bin-open890.bat`
+**Why not test the PS1 launcher in CI:** `Start-Process powershell.exe -Wait` with the PS1 launcher hung indefinitely in CI (10-min job timeout), likely because the child PowerShell session blocks on console/job-object inherited from the runner. Testing the underlying server start + asserting PS1 content is equivalent coverage.
+
+If Windows startup regresses, download `smoke-windows-diagnostics` artifact and inspect:
+- `open890-install.log` — Inno Setup log (confirms what was installed and where)
+- `open890-server.log` — stdout+stderr from `bin\open890.bat start` (shows cmd.exe or Erlang errors)
+- Windows Application Event Log entries (if beam/erlang/vcruntime errors occurred)
 
 ## Post-Release Checklist
 - Confirm release is published (not draft, not missing assets).
