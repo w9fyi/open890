@@ -1,7 +1,8 @@
 param(
   [string]$RootDir = ".",
   [string]$Url = "http://localhost:4000",
-  [int]$TimeoutSeconds = 45
+  [int]$TimeoutSeconds = 45,
+  [switch]$Headless
 )
 
 $ErrorActionPreference = "SilentlyContinue"
@@ -60,8 +61,15 @@ function New-Open890DiagnosticsBundle {
     Copy-Item -Path $serverLog -Destination (Join-Path $bundleDir "open890-server.log") -Force
   }
 
+  $releaseLogDir = Join-Path $RootDir "log"
+  if (Test-Path $releaseLogDir) {
+    $releaseLogDest = Join-Path $bundleDir "release-log"
+    Copy-Item -Path $releaseLogDir -Destination $releaseLogDest -Recurse -Force
+  }
+
   $pidCheckLog = Join-Path $bundleDir "open890-pid-check.log"
-  cmd.exe /c "`"$RootDir\bin\open890.bat`" pid" 2>&1 |
+  $pidCmd = "`"`"$RootDir\bin\open890.bat`" pid`""
+  & $env:ComSpec /d /c $pidCmd 2>&1 |
     Out-File -FilePath $pidCheckLog -Encoding UTF8
 
   $dirListing = Join-Path $bundleDir "install-dir-listing.txt"
@@ -151,7 +159,7 @@ $ready = Test-Open890Ready -Endpoint $Url
 
 if (-not $ready) {
   $startCommand = "`"$RootDir\bin\open890.bat`" start > `"$serverLog`" 2>&1"
-  Start-Process -FilePath "cmd.exe" -ArgumentList "/c $startCommand" -WindowStyle Minimized
+  Start-Process -FilePath $env:ComSpec -ArgumentList @("/d", "/c", "`"$startCommand`"") -WindowStyle Minimized
 }
 
 for ($i = 0; $i -lt $TimeoutSeconds; $i++) {
@@ -162,7 +170,17 @@ for ($i = 0; $i -lt $TimeoutSeconds; $i++) {
   Start-Sleep -Seconds 1
 }
 
-Start-Process $Url
+if (-not $Headless) {
+  Start-Process $Url
+}
+
+if ($Headless) {
+  if (-not $ready) {
+    Write-Error "open890 did not become ready at $Url within $TimeoutSeconds seconds. Check: $serverLog"
+    exit 1
+  }
+  exit 0
+}
 
 Add-Type -AssemblyName PresentationFramework
 

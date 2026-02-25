@@ -349,8 +349,96 @@ jobs:
           path: /tmp/open890-${{ steps.vars.outputs.TAG }}-macos-installer.pkg
           if-no-files-found: error
 
+  smoke-windows:
+    needs: [build-windows]
+    runs-on: windows-latest
+    steps:
+      - name: Download Windows installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-windows-installer
+          path: ${{ runner.temp }}\installer
+
+      - name: Run installer silently
+        shell: powershell
+        run: |
+          $installerPath = Get-ChildItem -Path "$env:RUNNER_TEMP\installer" -Filter "*.exe" | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $installerPath) { throw "Installer .exe not found in artifact." }
+          $installLog = Join-Path $env:RUNNER_TEMP "open890-install.log"
+          $proc = Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /LOG=`"$installLog`"" -Wait -PassThru
+          "INSTALL_LOG=$installLog" >> $env:GITHUB_ENV
+          if ($proc.ExitCode -ne 0) { throw "Installer exited with code $($proc.ExitCode)" }
+
+      - name: Locate install directory
+        shell: powershell
+        run: |
+          $candidates = @("$env:ProgramFiles\open890", "${env:ProgramFiles(x86)}\open890")
+          $installRoot = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $installRoot) { throw "open890 install directory not found under Program Files." }
+          "INSTALL_ROOT=$installRoot" >> $env:GITHUB_ENV
+
+      - name: Verify installed files and cd /d patch
+        shell: powershell
+        run: |
+          $required = @(
+            "$env:INSTALL_ROOT\open890-launcher.bat",
+            "$env:INSTALL_ROOT\open890-launcher.ps1",
+            "$env:INSTALL_ROOT\bin\open890.bat"
+          )
+          foreach ($path in $required) {
+            if (!(Test-Path $path)) { throw "Missing required file: $path" }
+          }
+          $binScript = "$env:INSTALL_ROOT\bin\open890.bat"
+          if ((Get-Content $binScript -Raw) -notlike '*cd /d "%~dp0\.."*') {
+            throw "bin\open890.bat is missing the drive switch fix (cd /d)."
+          }
+
+      - name: Start open890 via PS1 launcher (headless)
+        shell: powershell
+        run: |
+          $appUrl = "http://localhost:4000"
+          $serverLog = Join-Path $env:RUNNER_TEMP "open890-server.log"
+          "OPEN890_SERVER_LOG=$serverLog" >> $env:GITHUB_ENV
+          $proc = Start-Process powershell `
+            -ArgumentList @(
+              "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+              "`"$env:INSTALL_ROOT\open890-launcher.ps1`"",
+              "-RootDir", "`"$env:INSTALL_ROOT`"",
+              "-Url", $appUrl,
+              "-TimeoutSeconds", "90",
+              "-Headless"
+            ) `
+            -Wait -PassThru `
+            -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP "launcher-stdout.log") `
+            -RedirectStandardError  (Join-Path $env:RUNNER_TEMP "launcher-stderr.log")
+          "LAUNCHER_EXIT_CODE=$($proc.ExitCode)" >> $env:GITHUB_ENV
+          if ($proc.ExitCode -ne 0) {
+            Get-Content (Join-Path $env:RUNNER_TEMP "launcher-stderr.log") -ErrorAction SilentlyContinue
+            throw "Launcher exited with code $($proc.ExitCode) — open890 did not become ready."
+          }
+
+      - name: Stop open890
+        if: always()
+        shell: powershell
+        run: |
+          if (Test-Path "$env:INSTALL_ROOT\bin\open890.bat") {
+            Start-Process -FilePath $env:ComSpec -ArgumentList "/c `"$env:INSTALL_ROOT\bin\open890.bat`" stop" -Wait -WindowStyle Hidden
+          }
+
+      - name: Upload smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-windows-diagnostics
+          path: |
+            ${{ env.INSTALL_LOG }}
+            ${{ env.OPEN890_SERVER_LOG }}
+            ${{ runner.temp }}/launcher-stdout.log
+            ${{ runner.temp }}/launcher-stderr.log
+          if-no-files-found: ignore
+
   publish-release:
-    needs: [build-ubuntu, build-windows, build-macos]
+    needs: [build-ubuntu, smoke-windows, build-macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

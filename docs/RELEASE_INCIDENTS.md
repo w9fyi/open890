@@ -68,3 +68,15 @@
     - https://github.com/w9fyi/open890/issues/1#issuecomment-3942030849
 - Notes:
   - Keep issue triage linked here so future sessions can quickly reconstruct post-release support history.
+
+## 2026-02-25: `open890-launcher.ps1` cmd.exe quoting bug (`v0.1.8`)
+- Root cause identified from Issue #1:
+  - `open890-launcher.ps1` used `Start-Process -FilePath "cmd.exe" -ArgumentList "/c $startCommand"` where `$startCommand` began and ended with `"`.
+  - Windows `cmd.exe /c` applies a quote-stripping rule when the remainder starts with `"`: it strips the first `"` and the last `"` in the entire string. With a path containing spaces (the default `C:\Program Files\open890`), this left the executable path unquoted — Windows tried to run `C:\Program` (which doesn't exist) and the Erlang server never started.
+  - The CI smoke test happened to already use the correct pattern (array `ArgumentList` with outer-quote wrapping on the command), so the smoke passed while the field install failed.
+  - Same bug also present in `cmd.exe /c` invocation inside `New-Open890DiagnosticsBundle` (pid check).
+- Corrective actions:
+  1. Server start: changed to `Start-Process -FilePath $env:ComSpec -ArgumentList @("/d", "/c", $startCommand)` with `$startCommand` wrapped in an extra outer pair of `"` (matching smoke test pattern).
+  2. Pid check: changed to `& $env:ComSpec /d /c $pidCmd` with same outer-quote wrapping.
+  3. Diagnostics bundle: added collection of Erlang release log directory (`$RootDir\log\`).
+- Released as `v0.1.8`.
