@@ -221,27 +221,15 @@ jobs:
         run: |
           $appUrl = "${{ inputs.app_url }}"
           $timeoutSeconds = [int]"${{ inputs.timeout_seconds }}"
-          $launcherStdoutLog = Join-Path $env:RUNNER_TEMP "open890-launcher-stdout.log"
-          $launcherStderrLog = Join-Path $env:RUNNER_TEMP "open890-launcher-stderr.log"
-          "LAUNCHER_STDOUT_LOG=$launcherStdoutLog" >> $env:GITHUB_ENV
-          "LAUNCHER_STDERR_LOG=$launcherStderrLog" >> $env:GITHUB_ENV
-
-          $proc = Start-Process powershell `
-            -ArgumentList @(
-              "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-              "`"$env:INSTALL_ROOT\open890-launcher.ps1`"",
-              "-RootDir", "`"$env:INSTALL_ROOT`"",
-              "-Url", $appUrl,
-              "-TimeoutSeconds", $timeoutSeconds,
-              "-Headless"
-            ) `
-            -Wait -PassThru `
-            -RedirectStandardOutput $launcherStdoutLog `
-            -RedirectStandardError  $launcherStderrLog
+          $launcherScript = "$env:INSTALL_ROOT\open890-launcher.ps1"
+          # Use a single argument string with explicit path quoting.
+          # Do NOT use -RedirectStandardOutput/-RedirectStandardError with -Wait:
+          # doing so forces UseShellExecute=false on the child, which allows the
+          # Erlang server (grandchild) to inherit pipe handles and deadlock the wait.
+          $launcherArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$launcherScript`" -RootDir `"$env:INSTALL_ROOT`" -Url $appUrl -TimeoutSeconds $timeoutSeconds -Headless"
+          $proc = Start-Process powershell.exe -ArgumentList $launcherArgs -Wait -PassThru
 
           if ($proc.ExitCode -ne 0) {
-            Write-Host "=== launcher stderr ==="
-            Get-Content $launcherStderrLog -ErrorAction SilentlyContinue
             throw "PS1 launcher exited with code $($proc.ExitCode) - open890 did not become ready via launcher path."
           }
 

@@ -12,7 +12,7 @@ notify() {
   local message="$1"
   /usr/bin/osascript \
     -e 'on run argv' \
-    -e 'display dialog (item 1 of argv) with title "open890" buttons {"OK"} default button "OK"' \
+    -e 'display dialog (item 1 of argv) with title "open890" buttons {"OK"} default button "OK" giving up after 30' \
     -e 'end run' \
     "$message" >/dev/null 2>&1 || true
 }

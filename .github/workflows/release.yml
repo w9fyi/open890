@@ -352,6 +352,7 @@ jobs:
   smoke-windows:
     needs: [build-windows]
     runs-on: windows-latest
+    timeout-minutes: 10
     steps:
       - name: Download Windows installer artifact
         uses: actions/download-artifact@v4
@@ -399,21 +400,15 @@ jobs:
           $appUrl = "http://localhost:4000"
           $serverLog = Join-Path $env:RUNNER_TEMP "open890-server.log"
           "OPEN890_SERVER_LOG=$serverLog" >> $env:GITHUB_ENV
-          $proc = Start-Process powershell `
-            -ArgumentList @(
-              "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-              "`"$env:INSTALL_ROOT\open890-launcher.ps1`"",
-              "-RootDir", "`"$env:INSTALL_ROOT`"",
-              "-Url", $appUrl,
-              "-TimeoutSeconds", "90",
-              "-Headless"
-            ) `
-            -Wait -PassThru `
-            -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP "launcher-stdout.log") `
-            -RedirectStandardError  (Join-Path $env:RUNNER_TEMP "launcher-stderr.log")
+          $launcherScript = "$env:INSTALL_ROOT\open890-launcher.ps1"
+          # Use a single argument string with explicit path quoting.
+          # Do NOT use -RedirectStandardOutput/-RedirectStandardError with -Wait:
+          # doing so forces UseShellExecute=false on the child, which allows the
+          # Erlang server (grandchild) to inherit pipe handles and deadlock the wait.
+          $launcherArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$launcherScript`" -RootDir `"$env:INSTALL_ROOT`" -Url $appUrl -TimeoutSeconds 90 -Headless"
+          $proc = Start-Process powershell.exe -ArgumentList $launcherArgs -Wait -PassThru
           "LAUNCHER_EXIT_CODE=$($proc.ExitCode)" >> $env:GITHUB_ENV
           if ($proc.ExitCode -ne 0) {
-            Get-Content (Join-Path $env:RUNNER_TEMP "launcher-stderr.log") -ErrorAction SilentlyContinue
             throw "Launcher exited with code $($proc.ExitCode) - open890 did not become ready."
           }
 
@@ -433,8 +428,6 @@ jobs:
           path: |
             ${{ env.INSTALL_LOG }}
             ${{ env.OPEN890_SERVER_LOG }}
-            ${{ runner.temp }}/launcher-stdout.log
-            ${{ runner.temp }}/launcher-stderr.log
           if-no-files-found: ignore
 
   smoke-ubuntu:
@@ -507,6 +500,7 @@ jobs:
   smoke-macos:
     needs: [build-macos]
     runs-on: macos-latest
+    timeout-minutes: 10
     steps:
       - name: Download macOS pkg artifact
         uses: actions/download-artifact@v4
