@@ -30,8 +30,13 @@ function New-Open890DiagnosticsBundle {
   param([string]$FailureReason)
 
   $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-  $desktopDir = [Environment]::GetFolderPath("Desktop")
-  if ([string]::IsNullOrWhiteSpace($desktopDir)) {
+  # Prefer $env:USERPROFILE\Desktop — reliable even when running elevated (e.g. post-install launch).
+  # GetFolderPath("Desktop") can resolve to the admin/system profile under elevation or OneDrive path.
+  $desktopDir = Join-Path $env:USERPROFILE "Desktop"
+  if (-not (Test-Path $desktopDir)) {
+    $desktopDir = [Environment]::GetFolderPath("Desktop")
+  }
+  if ([string]::IsNullOrWhiteSpace($desktopDir) -or -not (Test-Path $desktopDir)) {
     $desktopDir = $env:TEMP
   }
 
