@@ -394,23 +394,46 @@ jobs:
             throw "bin\open890.bat is missing the drive switch fix (cd /d)."
           }
 
-      - name: Start open890 via PS1 launcher (headless)
+      - name: Verify PS1 launcher quote fix
+        shell: powershell
+        run: |
+          # Assert that the installed PS1 launcher uses outer-quote wrapping so that
+          # cmd.exe /c does not strip inner quotes around paths containing spaces.
+          $ps1 = Get-Content "$env:INSTALL_ROOT\open890-launcher.ps1" -Raw
+          if ($ps1 -notmatch 'ArgumentList @\("/d"') {
+            throw "PS1 launcher is missing the outer-quote Start-Process fix."
+          }
+          Write-Host "PS1 launcher quote fix verified."
+
+      - name: Start open890 server and wait for readiness
         shell: powershell
         run: |
           $appUrl = "http://localhost:4000"
           $serverLog = Join-Path $env:RUNNER_TEMP "open890-server.log"
           "OPEN890_SERVER_LOG=$serverLog" >> $env:GITHUB_ENV
-          $launcherScript = "$env:INSTALL_ROOT\open890-launcher.ps1"
-          # Use a single argument string with explicit path quoting.
-          # Do NOT use -RedirectStandardOutput/-RedirectStandardError with -Wait:
-          # doing so forces UseShellExecute=false on the child, which allows the
-          # Erlang server (grandchild) to inherit pipe handles and deadlock the wait.
-          $launcherArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$launcherScript`" -RootDir `"$env:INSTALL_ROOT`" -Url $appUrl -TimeoutSeconds 90 -Headless"
-          $proc = Start-Process powershell.exe -ArgumentList $launcherArgs -Wait -PassThru
-          "LAUNCHER_EXIT_CODE=$($proc.ExitCode)" >> $env:GITHUB_ENV
-          if ($proc.ExitCode -ne 0) {
-            throw "Launcher exited with code $($proc.ExitCode) - open890 did not become ready."
+          $batPath = "$env:INSTALL_ROOT\bin\open890.bat"
+
+          # Start the Erlang server asynchronously. Outer-quote wrapping is required
+          # for paths that contain spaces (e.g. C:\Program Files\open890).
+          # -WindowStyle Hidden uses UseShellExecute=true to avoid handle inheritance.
+          $startCmd = "`"`"$batPath`" start > `"$serverLog`" 2>&1`""
+          Start-Process -FilePath $env:ComSpec -ArgumentList @("/d", "/c", $startCmd) -WindowStyle Hidden
+
+          # Poll for HTTP readiness (up to 90 seconds).
+          $ready = $false
+          for ($i = 0; $i -lt 90; $i++) {
+            try {
+              $r = Invoke-WebRequest -UseBasicParsing -Uri $appUrl -TimeoutSec 2 -ErrorAction SilentlyContinue
+              if ($r -and $r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { $ready = $true; break }
+            } catch {}
+            Start-Sleep -Seconds 1
           }
+          if (-not $ready) {
+            Write-Host "=== Server log ==="
+            Get-Content $serverLog -ErrorAction SilentlyContinue
+            throw "open890 did not become ready at $appUrl within 90 seconds."
+          }
+          Write-Host "open890 is ready at $appUrl"
 
       - name: Stop open890
         if: always()
