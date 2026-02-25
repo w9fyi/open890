@@ -557,29 +557,21 @@ jobs:
 
       - name: Start open890 via macOS launcher
         run: |
-          SERVER_LOG="$RUNNER_TEMP/open890-server.log"
-          echo "OPEN890_SERVER_LOG=$SERVER_LOG" >> "$GITHUB_ENV"
-          OPEN890_LOG_FILE="$SERVER_LOG" OPEN890_START_TIMEOUT_SECONDS=90 \
-            "$INSTALL_ROOT/open890-launcher-macos.sh"
-          if ! /usr/bin/curl -fsSI "http://localhost:4000" >/dev/null 2>&1; then
-            echo "=== server log ==="
-            cat "$SERVER_LOG" 2>/dev/null || echo "(no log)"
-            echo "open890 not ready after launcher exit."
-            exit 1
-          fi
+          "$INSTALL_ROOT/open890-launcher-macos.sh"
+          for i in $(seq 1 90); do
+            if /usr/bin/curl -fsSI "http://localhost:4000" >/dev/null 2>&1; then
+              echo "open890 ready after ${i}s."
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "open890 not ready after 90s."
+          exit 1
 
       - name: Stop open890
         if: always()
         run: |
           "$INSTALL_ROOT/bin/open890" stop 2>/dev/null || true
-
-      - name: Upload smoke diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: smoke-macos-diagnostics
-          path: ${{ env.OPEN890_SERVER_LOG }}
-          if-no-files-found: ignore
 
   publish-release:
     needs: [smoke-ubuntu, smoke-windows, smoke-macos]
