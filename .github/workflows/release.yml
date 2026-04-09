@@ -4,6 +4,19 @@ on:
   push:
     tags:
       - 'v*'
+  pull_request:
+    branches:
+      - main
+    paths:
+      # Launcher scripts and release overlays — the files that were dark
+      # to PR-time CI until now and caused the #1 browser-auto-open miss.
+      - 'rel/**'
+      # Installer configs — Inno Setup .iss, macOS pkg bits, anything that
+      # changes what ends up in the built release artifacts.
+      - 'installers/**'
+      # The release workflow itself — if we change CI job logic, we want
+      # the new logic to run on its own PR (meta but correct).
+      - '.github/workflows/release.yml'
 
 permissions:
   contents: write
@@ -22,7 +35,16 @@ jobs:
       - name: Set vars
         id: vars
         run: |
-          echo "TAG=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          # On tag pushes, GITHUB_REF is refs/tags/vX.Y.Z → TAG=vX.Y.Z.
+          # On pull_request events, GITHUB_REF is refs/pull/N/merge, which
+          # the old strip turned into "N/merge" — a slash breaks artifact
+          # filenames downstream. Use a stable pr-N label instead.
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          if [ -n "$PR_NUMBER" ]; then
+            echo "TAG=pr-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          else
+            echo "TAG=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          fi
           cat "$GITHUB_OUTPUT"
 
       - name: Install OTP and Elixir
@@ -105,7 +127,16 @@ jobs:
         id: vars
         shell: bash
         run: |
-          echo "TAG=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          # On tag pushes, GITHUB_REF is refs/tags/vX.Y.Z → TAG=vX.Y.Z.
+          # On pull_request events, GITHUB_REF is refs/pull/N/merge, which
+          # the old strip turned into "N/merge" — a slash breaks artifact
+          # filenames downstream. Use a stable pr-N label instead.
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          if [ -n "$PR_NUMBER" ]; then
+            echo "TAG=pr-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          else
+            echo "TAG=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          fi
           cat "$GITHUB_OUTPUT"
 
       - name: Install Erlang and Elixir
@@ -235,7 +266,16 @@ jobs:
       - name: Set vars
         id: vars
         run: |
-          echo "TAG=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          # On tag pushes, GITHUB_REF is refs/tags/vX.Y.Z → TAG=vX.Y.Z.
+          # On pull_request events, GITHUB_REF is refs/pull/N/merge, which
+          # the old strip turned into "N/merge" — a slash breaks artifact
+          # filenames downstream. Use a stable pr-N label instead.
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          if [ -n "$PR_NUMBER" ]; then
+            echo "TAG=pr-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          else
+            echo "TAG=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          fi
           cat "$GITHUB_OUTPUT"
 
       - name: Install OTP and Elixir
@@ -627,6 +667,10 @@ jobs:
   publish-release:
     needs: [smoke-ubuntu, smoke-windows, smoke-macos]
     runs-on: ubuntu-latest
+    # Publish only on actual tag pushes. On pull_request runs we want the
+    # build + smoke jobs to execute (to validate the fix) but absolutely
+    # not the GitHub release publication step.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
 
