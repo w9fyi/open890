@@ -1,0 +1,133 @@
+name: Bug report
+description: Report a problem with open890
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem with open890! Fill in what you can and leave blank anything you're unsure about — we'll help you figure out the rest in a reply.
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: How bad is this problem for you?
+      options:
+        - "Critical — App won't launch or lost my settings"
+        - "Severe — Major feature broken, no workaround"
+        - "High — Important feature broken, I can work around it"
+        - "Medium — Annoying but usable"
+        - "Low — Small / cosmetic / suggestion"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      placeholder: "I opened open890 in my browser, clicked Connect, and the waterfall never showed up."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: false
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open https://...
+        2. Click Connect
+        3. ...
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: open890 version
+      description: "Find this at the bottom of the page, or in the About dialog. Example: v0.1.12"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: install_type
+    attributes:
+      label: How did you install open890?
+      options:
+        - "macOS .pkg installer"
+        - "Windows .exe installer"
+        - "Ubuntu .tar.gz"
+        - "Docker"
+        - "Built from source"
+        - "Not sure"
+    validations:
+      required: false
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system + version
+      placeholder: "macOS 26.1 / Windows 11 / Ubuntu 24.04"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Which browser?
+      options:
+        - Safari
+        - Chrome
+        - Firefox
+        - Edge
+        - Other
+    validations:
+      required: false
+
+  - type: input
+    id: radio_firmware
+    attributes:
+      label: TS-890S firmware version
+      description: "On the radio: MENU → 7 (Misc) → 00. Example: 1.25"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: connection
+    attributes:
+      label: How is open890 connecting to the radio?
+      options:
+        - "LAN (KNS, TCP port 60000)"
+        - "USB serial cable"
+        - "Not sure"
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Browser console messages (optional)
+      description: |
+        Very helpful! To collect these:
+        - Safari: Develop menu → Show JavaScript Console. If you don't see Develop menu: Safari → Settings → Advanced → check "Show features for web developers".
+        - Chrome/Edge: View → Developer → JavaScript Console (or press Cmd+Option+J / Ctrl+Shift+J).
+        - Firefox: Tools → Browser Tools → Web Developer Tools → Console tab.
+        Reproduce the bug with the console open, then copy any red error lines and paste them below.
+      value: |
+        ```
+        paste errors here
+        ```
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        Not sure how to find something above? Submit the form anyway — we'll guide you in a reply.
