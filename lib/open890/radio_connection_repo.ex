@@ -9,7 +9,7 @@ defmodule Open890.RadioConnectionRepo do
   def all do
     table_name()
     |> :dets.select(@select_all)
-    |> Enum.map(fn {_id, conn} -> conn end)
+    |> Enum.map(fn {_id, conn} -> migrate(conn) end)
   end
 
   def find(id) do
@@ -22,11 +22,25 @@ defmodule Open890.RadioConnectionRepo do
           %RadioConnection{} = conn
         }
       ] ->
-        {:ok, conn}
+        {:ok, migrate(conn)}
 
       _ ->
         {:error, :not_found}
     end
+  end
+
+  # Backfills fields added after a connection was first saved.
+  # DETS stores raw Erlang maps, so records created before a field
+  # was added to the struct will be missing that key.
+  defp migrate(%RadioConnection{} = conn) do
+    defaults = %{auto_launch: false}
+
+    Enum.reduce(defaults, conn, fn {key, default}, acc ->
+      case Map.fetch(acc, key) do
+        {:ok, _} -> acc
+        :error -> Map.put(acc, key, default)
+      end
+    end)
   end
 
   def all_raw do
@@ -77,6 +91,7 @@ defmodule Open890.RadioConnectionRepo do
           "user_name" => user_name,
           "password" => password,
           "auto_start" => auto_start,
+          "auto_launch" => auto_launch,
           "user_is_admin" => user_is_admin,
           "cloudlog_enabled" => cloudlog_enabled,
           "cloudlog_url" => cloudlog_url,
@@ -90,6 +105,7 @@ defmodule Open890.RadioConnectionRepo do
       ip_address: ip_address,
       tcp_port: tcp_port,
       auto_start: auto_start,
+      auto_launch: auto_launch,
       user_name: user_name,
       password: password,
       user_is_admin: user_is_admin,

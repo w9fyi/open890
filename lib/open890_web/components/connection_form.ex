@@ -71,6 +71,18 @@ defmodule Open890Web.Components.ConnectionForm do
         </div>
       </div>
 
+      <div class="field">
+        <div class="ui checkbox">
+          <%= checkbox @f, :auto_launch, class: "hidden", tabindex: "0" %>
+          <label for="radio_connection_auto_launch">
+            Auto-Launch
+            <span data-inverted="" data-position="bottom center" data-tooltip="Skip the connection list and go straight to the radio display on launch">
+              <i class="question circle grey icon"></i>
+            </span>
+          </label>
+        </div>
+      </div>
+
     <div class="field">
       <div class="ui checkbox">
         <%= checkbox @f, :cloudlog_enabled, class: "hidden", tabindex: "0" %>
