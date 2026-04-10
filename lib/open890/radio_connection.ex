@@ -16,6 +16,7 @@ defmodule Open890.RadioConnection do
             password: nil,
             user_is_admin: false,
             auto_start: true,
+            auto_launch: false,
             type: nil,
             cloudlog_enabled: false,
             cloudlog_url: nil,
@@ -132,6 +133,7 @@ defmodule Open890.RadioConnection do
         password: params["password"],
         user_is_admin: params["user_is_admin"],
         auto_start: params["auto_start"],
+        auto_launch: params["auto_launch"],
         cloudlog_enabled: params["cloudlog_enabled"],
         cloudlog_url:
           params["cloudlog_url"] |> to_string() |> String.trim() |> String.trim_trailing("/"),
