@@ -4,6 +4,19 @@ on:
   push:
     tags:
       - 'v*'
+  pull_request:
+    branches:
+      - main
+    paths:
+      # Launcher scripts and release overlays — the files that were dark
+      # to PR-time CI until now and caused the #1 browser-auto-open miss.
+      - 'rel/**'
+      # Installer configs — Inno Setup .iss, macOS pkg bits, anything that
+      # changes what ends up in the built release artifacts.
+      - 'installers/**'
+      # The release workflow itself — if we change CI job logic, we want
+      # the new logic to run on its own PR (meta but correct).
+      - '.github/workflows/release.yml'
 
 permissions:
   contents: write
@@ -22,7 +35,16 @@ jobs:
       - name: Set vars
         id: vars
         run: |
-          echo "TAG=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          # On tag pushes, GITHUB_REF is refs/tags/vX.Y.Z → TAG=vX.Y.Z.
+          # On pull_request events, GITHUB_REF is refs/pull/N/merge, which
+          # the old strip turned into "N/merge" — a slash breaks artifact
+          # filenames downstream. Use a stable pr-N label instead.
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          if [ -n "$PR_NUMBER" ]; then
+            echo "TAG=pr-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          else
+            echo "TAG=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          fi
           cat "$GITHUB_OUTPUT"
 
       - name: Install OTP and Elixir
@@ -105,7 +127,16 @@ jobs:
         id: vars
         shell: bash
         run: |
-          echo "TAG=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          # On tag pushes, GITHUB_REF is refs/tags/vX.Y.Z → TAG=vX.Y.Z.
+          # On pull_request events, GITHUB_REF is refs/pull/N/merge, which
+          # the old strip turned into "N/merge" — a slash breaks artifact
+          # filenames downstream. Use a stable pr-N label instead.
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          if [ -n "$PR_NUMBER" ]; then
+            echo "TAG=pr-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          else
+            echo "TAG=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          fi
           cat "$GITHUB_OUTPUT"
 
       - name: Install Erlang and Elixir
@@ -235,7 +266,16 @@ jobs:
       - name: Set vars
         id: vars
         run: |
-          echo "TAG=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          # On tag pushes, GITHUB_REF is refs/tags/vX.Y.Z → TAG=vX.Y.Z.
+          # On pull_request events, GITHUB_REF is refs/pull/N/merge, which
+          # the old strip turned into "N/merge" — a slash breaks artifact
+          # filenames downstream. Use a stable pr-N label instead.
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          if [ -n "$PR_NUMBER" ]; then
+            echo "TAG=pr-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          else
+            echo "TAG=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          fi
           cat "$GITHUB_OUTPUT"
 
       - name: Install OTP and Elixir
@@ -397,30 +437,44 @@ jobs:
       - name: Verify bat launcher content
         shell: powershell
         run: |
-          # Assert that the installed bat launcher directly calls bin\open890.bat start.
+          # Assert that the installed bat launcher starts the server via a
+          # minimized `start` window and then polls localhost:4000 before
+          # opening the browser. These two checks together encode the
+          # contract that (a) the server is backgrounded via `start` (not
+          # via cmd /c, which triggered the quote-stripping bug in v0.1.7),
+          # and (b) the browser auto-open regression from v0.1.9 is fixed.
           $bat = Get-Content "$env:INSTALL_ROOT\open890-launcher.bat" -Raw
-          if ($bat -notmatch 'call \.\\bin\\open890\.bat start') {
-            throw "open890-launcher.bat does not contain expected 'call .\bin\open890.bat start'."
+          if ($bat -notmatch 'start "open890" /min "%~dp0bin\\open890\.bat" start') {
+            throw "open890-launcher.bat does not background the server via 'start /min %~dp0bin\open890.bat start'."
+          }
+          if ($bat -notmatch 'localhost:4000') {
+            throw "open890-launcher.bat is missing the localhost:4000 browser-open poll."
           }
           Write-Host "Bat launcher content verified."
 
-      - name: Start open890 server and wait for readiness
+      - name: Launch open890 via launcher.bat and wait for readiness
         shell: powershell
         run: |
+          # This step exercises the ACTUAL desktop launcher end-to-end — the
+          # same .bat a user runs from the desktop shortcut after install.
+          # That means it validates both the `start /min` server backgrounding
+          # (which replaced the cmd.exe quote-stripped launcher from v0.1.7)
+          # AND the PowerShell browser-open poll (which was missing from v0.1.9
+          # through v0.1.12 and caused the auto-open regression in issue #1).
+          #
+          # We run it via Start-Process without -Wait, because the launcher's
+          # inner PS poll blocks until the server is ready (up to 60s) and
+          # then calls Start-Process on the URL. We do our own independent
+          # readiness poll from this outer shell.
           $appUrl = "http://localhost:4000"
-          $serverLog = Join-Path $env:RUNNER_TEMP "open890-server.log"
-          "OPEN890_SERVER_LOG=$serverLog" >> $env:GITHUB_ENV
-          $batPath = "$env:INSTALL_ROOT\bin\open890.bat"
+          $launcherPath = "$env:INSTALL_ROOT\open890-launcher.bat"
 
-          # Start the Erlang server asynchronously. Outer-quote wrapping is required
-          # for paths that contain spaces (e.g. C:\Program Files\open890).
-          # -WindowStyle Hidden uses UseShellExecute=true to avoid handle inheritance.
-          $startCmd = "`"`"$batPath`" start > `"$serverLog`" 2>&1`""
-          Start-Process -FilePath $env:ComSpec -ArgumentList @("/d", "/c", $startCmd) -WindowStyle Hidden
+          Start-Process -FilePath $launcherPath -WorkingDirectory $env:INSTALL_ROOT -WindowStyle Hidden
 
-          # Poll for HTTP readiness (up to 90 seconds).
+          # Poll for HTTP readiness. 120s outer budget gives the launcher's
+          # 60s inner poll room to finish, plus Erlang cold-start time.
           $ready = $false
-          for ($i = 0; $i -lt 90; $i++) {
+          for ($i = 0; $i -lt 120; $i++) {
             try {
               $r = Invoke-WebRequest -UseBasicParsing -Uri $appUrl -TimeoutSec 2 -ErrorAction SilentlyContinue
               if ($r -and $r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { $ready = $true; break }
@@ -428,11 +482,33 @@ jobs:
             Start-Sleep -Seconds 1
           }
           if (-not $ready) {
-            Write-Host "=== Server log ==="
-            Get-Content $serverLog -ErrorAction SilentlyContinue
-            throw "open890 did not become ready at $appUrl within 90 seconds."
+            Write-Host "=== Erlang release log dir ==="
+            Get-ChildItem "$env:INSTALL_ROOT\log" -Recurse -ErrorAction SilentlyContinue |
+              ForEach-Object { Write-Host "--- $($_.FullName) ---"; Get-Content $_.FullName -ErrorAction SilentlyContinue }
+            throw "open890 did not become ready at $appUrl within 120 seconds via open890-launcher.bat."
           }
-          Write-Host "open890 is ready at $appUrl"
+          Write-Host "open890 is ready at $appUrl (launched via open890-launcher.bat)"
+
+      - name: Validate launcher PowerShell snippet is syntactically sound
+        shell: powershell
+        run: |
+          # Belt-and-braces: extract the inline PS -Command from the .bat and
+          # run it through the PowerShell parser. Content-match only asserts
+          # the string is present; this asserts it's also valid PS so a
+          # future typo in the poll loop can't sneak through.
+          $bat = Get-Content "$env:INSTALL_ROOT\open890-launcher.bat" -Raw
+          if ($bat -notmatch 'powershell -NoProfile -Command "([^"]*)"') {
+            throw "Could not locate the PowerShell -Command block inside open890-launcher.bat."
+          }
+          $snippet = $Matches[1]
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseInput($snippet, [ref]$tokens, [ref]$errors)
+          if ($errors -and $errors.Count -gt 0) {
+            foreach ($e in $errors) { Write-Host "PS parse error: $($e.Message) at $($e.Extent.StartLineNumber):$($e.Extent.StartColumnNumber)" }
+            throw "open890-launcher.bat contains a syntactically invalid PowerShell -Command block."
+          }
+          Write-Host "Launcher PowerShell snippet parses cleanly."
 
       - name: Stop open890
         if: always()
@@ -442,6 +518,21 @@ jobs:
             Start-Process -FilePath $env:ComSpec -ArgumentList "/c `"$env:INSTALL_ROOT\bin\open890.bat`" stop" -Wait -WindowStyle Hidden
           }
 
+      - name: Collect Erlang release logs
+        if: always()
+        shell: powershell
+        run: |
+          # Gather the Erlang release log directory for upload. The launcher
+          # no longer captures stdout/stderr (start /min detaches the child),
+          # so Erlang's own log files are our primary diagnostic on failure.
+          $logDir = "$env:INSTALL_ROOT\log"
+          $stageDir = Join-Path $env:RUNNER_TEMP "open890-release-logs"
+          if (Test-Path $logDir) {
+            New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
+            Copy-Item -Path "$logDir\*" -Destination $stageDir -Recurse -Force -ErrorAction SilentlyContinue
+          }
+          "OPEN890_RELEASE_LOG_DIR=$stageDir" >> $env:GITHUB_ENV
+
       - name: Upload smoke diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -449,7 +540,7 @@ jobs:
           name: smoke-windows-diagnostics
           path: |
             ${{ env.INSTALL_LOG }}
-            ${{ env.OPEN890_SERVER_LOG }}
+            ${{ env.OPEN890_RELEASE_LOG_DIR }}
           if-no-files-found: ignore
 
   smoke-ubuntu:
@@ -576,6 +667,10 @@ jobs:
   publish-release:
     needs: [smoke-ubuntu, smoke-windows, smoke-macos]
     runs-on: ubuntu-latest
+    # Publish only on actual tag pushes. On pull_request runs we want the
+    # build + smoke jobs to execute (to validate the fix) but absolutely
+    # not the GitHub release publication step.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
 
